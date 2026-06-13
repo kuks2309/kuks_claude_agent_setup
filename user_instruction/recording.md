@@ -27,7 +27,7 @@
   ```markdown
   # User Instructions
 
-  본 파일은 사용자 원문 보존 — 요약 / 해석 / 재구성 금지. KST 시각 + 시간 역순 (최신 위).
+  본 파일은 사용자 원문 보존 — 요약 / 해석 / 재구성 금지. KST(Korea Standard Time) 시각 + 시간 역순 (최신 위).
 
   ---
   ```
@@ -46,10 +46,10 @@
 ```
 
 룰:
-- **KST** (Korea Standard Time / 한국 표준시) 시각, **시간 역순** (최신 위, prepend)
+- **KST**(Korea Standard Time) 시각, **시간 역순** (최신 위, prepend)
 - **사용자 원문만 인용** — 요약·해석·재구성 금지
 - 동일 요구의 단순 재확인은 생략 가능
-- 비밀번호 / NDA (Non-Disclosure Agreement / 비공개 합의) / 자격증명은 마스킹
+- 비밀번호 / NDA(Non-Disclosure Agreement) / 자격증명은 마스킹
 
 ## 5. 경계 — 기록 ≠ 분석
 
