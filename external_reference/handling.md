@@ -161,8 +161,8 @@ cd external_reference && ./install.sh <타깃-프로젝트-루트> [도메인...
 
 | sub-file | 도메인 | 트리거 예 |
 |---|---|---|
-| `domains/embedded.md` | 임베디드 | `ISR(`, `NVIC_`, `IRQHandler`, FreeRTOS API, MCU datasheet/Family Manual |
-| `domains/ros2.md` | ROS2 | `package.xml`, `rclpy`/`rclcpp`, `.launch.py`, REP 인용, sensor driver |
+| `domains/embedded-reference.md` | 임베디드 | `ISR(`, `NVIC_`, `IRQHandler`, FreeRTOS API, MCU datasheet/Family Manual |
+| `domains/ros2-reference.md` | ROS2 | `package.xml`, `rclpy`/`rclcpp`, `.launch.py`, REP 인용, sensor driver |
 | `domains/opencv.md` | OpenCV / Computer Vision | `cv2.`/`cv::`, `calibrateCamera`, distortion 모델, 카메라 calibration |
 | `domains/standards.md` | 표준 / 인증 | RFC·IEEE·ISO/IEC·JEDEC·AEC-Q 인용, KC/CE/FCC 인증 요구 |
 
