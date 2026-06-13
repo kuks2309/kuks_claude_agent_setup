@@ -33,10 +33,11 @@ shift
 
 DEST="$TARGET/docs/claude_guideline/$BUNDLE"
 
-# 1) 코어 복사
+# 1) 코어 복사 (handling.md + coding_standards.md)
 mkdir -p "$DEST"
 cp "$SRC/handling.md" "$DEST/handling.md"
-echo "✓ 코어 복사: docs/claude_guideline/$BUNDLE/handling.md"
+cp "$SRC/coding_standards.md" "$DEST/coding_standards.md"
+echo "✓ 코어 복사: docs/claude_guideline/$BUNDLE/{handling.md, coding_standards.md}"
 
 # 2) 도메인 선택 복사
 DOMAINS=()

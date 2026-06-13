@@ -4,6 +4,8 @@
 
 본 코어는 self-contained 다 — 본문 외 가이드라인·자동화 도구·Skill 의존 0. 본 파일 위반 시 거짓 단정 누적으로 다중 정정 라운드·토큰 낭비·신뢰 손상이 발생한다 (§12 참조).
 
+코딩 표준(ISO 26262·MISRA·Google C++ 등)의 라이선스·배포·규칙 digest 는 [coding_standards.md](coding_standards.md) 참조 (코어와 함께 설치).
+
 ## 설치
 
 본 번들 폴더(`external_reference/`)의 `install.sh` 로 설치한다:
