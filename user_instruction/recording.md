@@ -12,13 +12,13 @@
 
 ## 2. 설치 (규칙 파일)
 
-저장소 루트의 `install.sh` 로 설치한다:
+본 번들 폴더(`user_instruction/`)의 `install.sh` 로 설치한다:
 
 ```bash
-./install.sh user_instruction <타깃-프로젝트-루트>
+cd user_instruction && ./install.sh <타깃-프로젝트-루트>
 ```
 
-스크립트가 (1) 본 번들을 `docs/claude_guideline/user_instruction/` 로 복사하고, (2) 등록 스니펫(`claude.snippet.md`)을 타깃 `CLAUDE.md` 에 append 한다 (덮어쓰기 아님, 중복 시 스킵). 수동 설치 시 같은 두 단계를 직접 수행한다.
+스크립트가 (1) `recording.md` 를 `docs/claude_guideline/user_instruction/` 로 복사하고, (2) 등록 스니펫(`claude.snippet.md`)을 타깃 `CLAUDE.md` 에 append 한다 (덮어쓰기 아님, 중복 시 스킵). 수동 설치 시 같은 두 단계를 직접 수행한다.
 
 **활성화 게이트**: 본 파일이 `docs/claude_guideline/user_instruction/recording.md` 경로에 없으면 본 룰은 비활성.
 
