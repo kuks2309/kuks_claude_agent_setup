@@ -15,6 +15,20 @@ WHITELIST = {
     "ID", "OK", "OS", "IO", "AI", "ML", "PDF", "HTML", "CSS", "XML", "CSV",
     "MD", "SSOT", "OMC", "ROS", "ROS2", "KST", "NDA", "USB", "CAN", "PWM",
     "TF", "QOS", "RAM", "CPU", "GPU", "SQL", "SSH", "GIT", "NPM", "PR",
+    # 공통 추가
+    "ROM", "DDR", "TCP", "UDP", "IP", "DNS", "JWT", "CI", "CD",
+    # 프로젝트 / 코드 리뷰
+    "RxO", "DRY", "SOP", "DDS", "SOLID", "SRP", "OCP", "LSP", "ISP", "DIP",
+    # ROS2 / 로보틱스
+    "REP", "IMU", "FOV", "RTOS",
+    # 임베디드
+    "ADC", "DAC", "I2C", "SPI", "UART", "GPIO", "DMA", "ISR", "NVIC",
+    "HAL", "MCU", "WCET", "FFT", "FPU", "MPU", "RMW", "IRQ",
+    # 비전
+    "BGR", "RGB", "PAMI",
+    # 표준 / 인증 (고유명사)
+    "RFC", "IEEE", "ISO", "IEC", "JEDEC", "AEC", "MISRA", "ASIL", "AUTOSAR",
+    "CERT", "NASA", "JPL", "KC", "CE", "FCC", "UL", "PTP", "PEP", "LLVM", "GPL", "PSF",
 }
 
 
