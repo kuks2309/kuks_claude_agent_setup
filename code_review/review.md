@@ -14,7 +14,7 @@ cd code_review && ./install.sh <타깃-프로젝트-루트> [도메인...]
 
 스크립트가 코어(`review.md`)를 `docs/claude_guideline/code_review/` 로, 선택한 도메인(`domains/<도메인>.md`)을 `.../code_review/domains/` 로 복사하고, 등록 스니펫을 타깃 `CLAUDE.md` 에 append 한다 (덮어쓰기 아님).
 
-- **리뷰 산출물**: `docs/code_review/<주제>.md` — 폴더·파일이 없으면 만든다(승인 불요). 신규 생성 시 `docs/code_review/README.md` 도 함께 만든다.
+- **리뷰 산출물**: `docs/code_review/<주제>/YYYY-MM-DD.md` (날짜=버전) — 폴더·파일 없으면 만든다(승인 불요). 주제 폴더에 타임라인 인덱스 `README.md` 동반.
 - **활성화 게이트**: 본 파일이 `docs/claude_guideline/code_review/review.md` 경로에 없으면 본 SOP 는 비활성.
 
 ## 트리거
@@ -43,7 +43,7 @@ cd code_review && ./install.sh <타깃-프로젝트-루트> [도메인...]
    ↓
 [Step 6] 평가 (severity 클러스터)    ──→  ✓ Critical/High/Medium/Low/Info + 카테고리 태그
    ↓
-[Step 7] docs/code_review/<주제>.md 기록 ──→  ✓ KST 시각 (user_instruction 설치 시 매핑)
+[Step 7] docs/code_review/<주제>/YYYY-MM-DD.md 기록 ──→  ✓ 코드 버전 고정 + 인덱스 갱신
    ↓
 [Step 8] 자체 점검 grep              ──→  ✓ 헤더·#번호·카테고리 태그 통과
    ↓
@@ -182,21 +182,47 @@ Verdict: REQUEST CHANGES
 - **Step 4 Core 인벤토리** — 5 항목 작성, 누락 0.
 - **Step 5 도메인 인벤토리** — 감지된 도메인의 추가 표 작성. 빈 표는 "해당 항목 없음" 명시.
 - **Step 6 평가** — severity 클러스터 + 카테고리 태그. 모든 항목 인벤토리 `#` 인용.
-- **Step 7 기록** — `docs/code_review/<주제>.md`. 동일 주제 기존 파일 있으면 prepend(최신 위).
+- **Step 7 기록** — `docs/code_review/<주제>/YYYY-MM-DD.md`(날짜=버전). 코드 버전 고정 + 타임라인 인덱스(`README.md`) 갱신.
 - **Step 8 자체 점검** — 아래 grep 통과.
 - **Step 9 보고** — 1~2 줄. 변경 파일/후속 TODO 명시.
 
 ---
 
-## 기록 위치 / 템플릿
+## 기록 위치 · 버전 관리 (날짜 기반)
 
-기록 위치: `docs/code_review/<주제>.md` (`<주제>` = 대상 파일명/모듈명/패키지명). 동일 주제 기존 파일 → prepend(최신 위). `user_instruction` 번들 설치 시 같은 시각 entry 와 제목 매핑(선택).
+코드는 계속 바뀌므로 리뷰는 **특정 코드 상태의 스냅샷**이다. 요청마다 날짜로 버전을 매겨 누적한다.
+
+**위치**: `docs/code_review/<주제>/YYYY-MM-DD.md` (`<주제>` = 대상 파일명/모듈명/패키지명). 같은 날 재요청은 `YYYY-MM-DD-HHMM.md`. 폴더·파일 없으면 만든다(승인 불요). **날짜가 곧 버전.**
+
+**코드 버전 고정 (의무)** — 각 날짜 파일 헤더에 리뷰한 코드 상태를 박는다 (없으면 어느 코드를 리뷰했는지 추적 불가):
+
+- git: 리뷰 커밋 `<short-hash>` + 브랜치 + (있으면) PR(Pull Request) 번호
+- 비-git: 대상 파일 내용 해시 + 일자
+
+**타임라인 인덱스** — `docs/code_review/<주제>/README.md` 에 날짜·코드 버전·Verdict 표(최신 위):
+
+| 날짜 | 코드 버전 | Verdict | 핵심 |
+| --- | --- | --- | --- |
+| 2026-06-14 | abc1234 (PR #42) | COMMENT | race 1 잔존 |
+| 2026-06-10 | def5678 | REQUEST CHANGES | High 2 |
+
+**findings 상태 추적** — 직전 날짜 리뷰 대비 각 항목에 상태: `[해결]`(고침, 커밋 인용)·`[잔존]`·`[신규]`·`[퇴행]`(고쳤다 재발).
+
+**delta 리뷰 (재요청 시)** — 최초는 Core 5항목 전체. 재요청은 `git diff <직전 리뷰 커밋>..<현재>` 변경 파일·함수 중심 + 영향 findings 재평가. 변경 없는 부분은 직전 리뷰 cross-ref(재작성 X).
+
+**staleness** — 현재 `HEAD` 가 최신 리뷰 커밋보다 앞서면 인덱스에 "재리뷰 필요(미리뷰 N 커밋)" 표시.
+
+`user_instruction` 번들 설치 시 같은 시각 entry 와 제목 매핑(선택).
+
+### 날짜 파일 템플릿
 
 ```markdown
-## YYYY-MM-DD HH:MM (KST) — <짧은 제목>
+## YYYY-MM-DD (KST) — <주제> 리뷰
 
-### 트리거 요청
-(user_instruction 설치 시) `docs/user_instructions/user_instructions.md` `YYYY-MM-DD HH:MM` entry 참조.
+### 코드 버전
+- 리뷰 커밋: `abc1234` (branch `feat/x`, PR #42)   <!-- 비-git: 파일 내용 해시 -->
+- 직전 리뷰: YYYY-MM-DD @ `def5678` — delta `def5678..abc1234`
+- (user_instruction 설치 시) 같은 시각 `user_instructions.md` entry 참조
 
 ### 분석 분기 명시
 - 분기: 단위 코드 리뷰 / 전체 구조 분석
@@ -216,7 +242,7 @@ Verdict: REQUEST CHANGES
 severity 분포: Critical 0 / High 1 / Medium 6 / Low 3 / Info 2
 Verdict: REQUEST CHANGES
 
-**함수 #3 `name` — [태그] 요약 (Severity)**
+**함수 #3 `name` — [태그][잔존] 요약 (Severity)**
    재현: 위치 / 조건
    권고: 조치
 
@@ -238,13 +264,17 @@ Verdict: REQUEST CHANGES
 9. **자동 감지 무력화 금지** — 트리거 충족 + 설치 시 도메인 적용 의무(사용자 명시 거부 외)
 10. **인벤토리 5 항목 "없음" 명시 의무** — 비어도 "없음" 한 줄(점검 누락과 구분)
 11. **작성자 self-APPROVE 금지** — 별도 lane 에서만 `APPROVE`
+12. **날짜=버전 + 코드 버전 고정** — 요청마다 `<주제>/YYYY-MM-DD.md`, 리뷰 커밋/해시 명시, findings 상태(`[해결]`/`[잔존]`/`[신규]`/`[퇴행]`) 추적
 
 ---
 
 ## 자체 점검
 
 ```bash
-TARGET=docs/code_review/<주제>.md
+TARGET=docs/code_review/<주제>/YYYY-MM-DD.md
+
+# 0. 코드 버전 고정 (의무) — 리뷰 커밋 또는 파일 해시
+grep -E "리뷰 커밋: |코드 버전|파일 내용 해시" $TARGET
 
 # 1. Core 함수 표 헤더 (6 컬럼 보존)
 grep -E "^\| # +\| 함수 +\| 입력 +\| 출력 +\| 기능 +\| 위치 +\|" $TARGET
@@ -289,4 +319,4 @@ grep "^## " $TARGET | head -1
 
 ---
 
-**VERSION**: 1.0.0 (코어 분리판 — code_review.md(무버전) 기반, 도메인 Add-on sub-file 분리)
+**VERSION**: 1.1.0 (날짜 기반 리뷰 버전 관리 추가 — 코드 버전 고정·타임라인 인덱스·findings 상태 추적)
