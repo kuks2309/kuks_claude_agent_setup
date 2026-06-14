@@ -29,6 +29,8 @@ WHITELIST = {
     # 표준 / 인증 (고유명사)
     "RFC", "IEEE", "ISO", "IEC", "JEDEC", "AEC", "MISRA", "ASIL", "AUTOSAR",
     "CERT", "NASA", "JPL", "KC", "CE", "FCC", "UL", "PTP", "PEP", "LLVM", "GPL", "PSF",
+    # 고유명사·조직 (대문자 표기)
+    "FITO",
 }
 
 
@@ -61,8 +63,9 @@ def find_violations(text):
     text = re.sub(r"https?://\S+", " ", text)
     out = []
     seen = set()
-    # 문자+숫자 식별자(MD060·STM32·ESP32 등)는 약자 아님 — 순수 대문자만 검출
-    for m in re.finditer(r"\b([A-Z]{2,})\b(?![0-9])", text):
+    # 약자는 보통 2~6자. 문자+숫자 식별자(MD060·STM32)와 7자+ 대문자 단어
+    # (CODEOWNERS·UNVERIFIED·APPROVE 등)는 약자 아님 — 제외.
+    for m in re.finditer(r"\b([A-Z]{2,6})\b(?![0-9])", text):
         tok = m.group(1)
         if tok in WHITELIST or tok in seen:
             continue
