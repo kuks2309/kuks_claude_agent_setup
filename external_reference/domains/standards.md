@@ -7,7 +7,7 @@
 ## 1. 매뉴얼 종류 taxonomy
 
 | 종류 | 발행 단체 | 예 |
-|---|---|---|
+| --- | --- | --- |
 | **RFC** (Request for Comments) | IETF | RFC 793 (TCP), RFC 7519 (JWT) |
 | **IEEE 표준** | IEEE Standards Association | IEEE 802.11 (Wi-Fi), IEEE 754 (float), IEEE 1588 (PTP) |
 | **ISO / IEC 표준** | ISO / IEC | ISO 26262 (자동차 기능안전), IEC 61508 (산업 기능안전) |

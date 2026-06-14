@@ -32,7 +32,7 @@ node_name:
 **A-6. QoS 호환 매트릭스 (RxO — Requested vs Offered)** — 같은 토픽의 pub(offered) QoS 와 **모든** sub(requested) QoS 를 대조. 규칙: **offered(pub) ≥ requested(sub)** — 제공이 요구보다 약하면 연결 안 됨.
 
 | 축 | ❌ 연결 실패 (pub → sub) | 영향 |
-|---|---|---|
+| --- | --- | --- |
 | Reliability | `BEST_EFFORT` → `RELIABLE` | 구독 미연결 (반대는 OK) |
 | Durability | `VOLATILE` → `TRANSIENT_LOCAL` | late-joiner 가 마지막 latched 메시지 손실 (반대는 OK) |
 | Deadline / Liveliness | offered 주기 > requested 주기 | 미연결 |

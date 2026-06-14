@@ -7,7 +7,7 @@
 ## 1. 매뉴얼 종류 taxonomy
 
 | 종류 | 다루는 정보 | 예 |
-|---|---|---|
+| --- | --- | --- |
 | **OpenCV 공식 docs** | API reference, 함수 시그니처, default 파라미터, 버전별 차이 | docs.opencv.org/4.x/ |
 | **OpenCV 소스 코드** | 구현체, 실제 default, 알고리즘 변형 | github.com/opencv/opencv `modules/<module>/src/<file>.cpp` |
 | **알고리즘 원문 논문** | 알고리즘 의도, 가정, 권장 파라미터 범위 | Zhang 1999 (calibration), Lucas & Kanade 1981 (optical flow) |

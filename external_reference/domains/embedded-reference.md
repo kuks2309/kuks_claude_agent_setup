@@ -7,7 +7,7 @@
 ## 1. 매뉴얼 종류 taxonomy
 
 | 종류 | 다루는 정보 | 예 |
-|---|---|---|
+| --- | --- | --- |
 | **silicon datasheet** | 전기 특성, 핀맵, 패키지, Operation Conditions | `STM32F4 DataSheet`, `Infineon AURIX TC3xx DataSheet` |
 | **User / Family / Reference Manual** | peripheral register-level 동작, SR(service request)/IRQ 라우팅, DMA 토폴로지 | `STM32F4 Reference Manual`, `AURIX TC3xx Family Manual` |
 | **SDK / HAL 문서** | API 시그니처, sample, default 매크로 | `STM32 HAL UM`, `iLLD AURIX SDK manual` |

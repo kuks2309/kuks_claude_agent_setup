@@ -57,7 +57,7 @@ cd code_review && ./install.sh <타깃-프로젝트-루트> [도메인...]
 코드 리뷰 결과는 두 층으로 구성된다:
 
 | 층 | 내용 | 적용 조건 |
-|---|---|---|
+| --- | --- | --- |
 | **Core** (공통) | 목적·플로우차트·함수표·전역변수표·의존성 3-tier | 모든 리뷰 필수 |
 | **Domain Add-on** | 도메인별 추가 인벤토리·평가 카테고리 | 트리거 감지 + 해당 sub-file 설치 시 (다중 가능) |
 
@@ -74,7 +74,7 @@ cd code_review && ./install.sh <타깃-프로젝트-루트> [도메인...]
 ### 2. 코드 플로우차트
 
 | 요청 유형 | 플로우차트 형식 |
-|---|---|
+| --- | --- |
 | 단위 코드 리뷰 (1 함수·1 파일) | **단일 플로우 차트** — 진입/분기/루프/종료, 주요 조건문, 에러 경로 |
 | 전체 구조 분석 (디렉토리·다중 모듈) | **전체 코드 흐름도** — 모듈 간 호출 관계, 데이터 흐름, 진입점·종료점, 외부 인터페이스 |
 
@@ -107,7 +107,7 @@ cd code_review && ./install.sh <타깃-프로젝트-루트> [도메인...]
 ### 5. 의존성 3-tier 표
 
 | Tier | 정의 | 표기 |
-|---|---|---|
+| --- | --- | --- |
 | **빌드** | `package.xml`, `CMakeLists`, `setup.py`, `requirements.txt` 등 선언된 빌드 필수 의존성 | 패키지명, 버전 제약 |
 | **런타임 필수** | 실행에 반드시 필요한 외부 노드·서비스·HW 페리페럴·환경 변수 | 대상, **부재 시 동작 명시 의무** |
 | **런타임 선택** | 있으면 사용, 없으면 fallback. **fallback 동작 명시 의무** | 대상, fallback 정의 |
@@ -158,7 +158,7 @@ Verdict: REQUEST CHANGES
 도메인 특화 인벤토리·평가 카테고리는 `domains/` 하위의 **도메인별 sub-file** 로 둔다. 도메인은 계속 추가되며, 트리거 감지 + 해당 sub-file 설치 시에만 적용한다.
 
 | sub-file | 도메인 | 트리거 예 |
-|---|---|---|
+| --- | --- | --- |
 | `domains/ros2-review.md` | ROS2 코드 리뷰 | `package.xml`, `rclpy`/`rclcpp`, `.launch.py`, `rcl_interfaces` |
 | `domains/concurrency.md` | 동시성 (Threading/async) | `threading`, `asyncio`, `std::thread`, `std::mutex`, `async def`, callback group |
 | `domains/embedded-review.md` | 임베디드 / RTOS | `__attribute__((interrupt))`, `ISR(`, `NVIC_`, FreeRTOS API, `volatile` 빈출 |

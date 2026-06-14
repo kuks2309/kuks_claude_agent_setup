@@ -7,7 +7,7 @@
 ## 1. 매뉴얼 종류 taxonomy
 
 | 종류 | 다루는 정보 | 예 |
-|---|---|---|
+| --- | --- | --- |
 | **sensor datasheet** (벤더) | LiDAR/IMU/camera 의 물리 spec(scan rate, FoV, range, accuracy) | `Livox MID-360 DataSheet`, `Bosch BMI088 DataSheet` |
 | **벤더 ROS2 driver 문서** | 토픽 이름, frame_id 권장, QoS 권장, 파라미터 default | `livox_ros2_driver` README, `realsense-ros` docs |
 | **REP** (Robot Enhancement Proposal) | ROS 표준 명세 — 좌표계, TF tree, IMU frame_id, 단위 | REP-103, REP-105, REP-145 |

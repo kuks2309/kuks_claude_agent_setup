@@ -7,7 +7,7 @@
 ## 1. 표준 인덱스 (라이선스·배포)
 
 | 표준 | 범위 | 라이선스 | 재배포 | 배치 |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | ISO 26262-6 | 자동차 기능안전 SW | 유료 (ISO) | ❌ | `references/local/`(gitignore) + 공식 URL |
 | MISRA C / C++ | 안전 C/C++ | 유료 (MISRA) | ❌ | `references/local/` + URL |
 | AUTOSAR C++14 Guidelines | 안전 C++14 | 무료 열람, **복제 금지** ✅ | ❌ | URL 링크만 (autosar.org) |

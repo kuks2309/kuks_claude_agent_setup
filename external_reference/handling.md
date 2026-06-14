@@ -67,7 +67,7 @@ cd external_reference && ./install.sh <타깃-프로젝트-루트> [도메인...
 ### 3.2 1차 source 종류는 다중이며 별도 보관·검증
 
 | source 종류 | 다루는 정보 | 검증 책임 |
-|---|---|---|
+| --- | --- | --- |
 | **DataSheet** (벤더) | pinout, package, 전기 특성 | spec 단정 |
 | **User / Family / Reference Manual** (벤더) | register-level 동작, IP 챕터, DMA/IRQ 토폴로지 | 동작 단정 |
 | **SDK / 드라이버 문서** (벤더) | 권장 사용 범위, API 시그니처, default | SW 권장 |
@@ -128,7 +128,7 @@ cd external_reference && ./install.sh <타깃-프로젝트-루트> [도메인...
 ## 10. 검증 등급 (강제 표기)
 
 | 표기 | 의미 | 허용 단정어 |
-|------|------|-------------|
+| --- | --- | --- |
 | **✓** | 1차 source 직접 확인(file:line 또는 source 페이지) | 강한 단정 OK |
 | **ⓦ** | 다른 워커·AI 보고만, lead 직접 미확인 | 약한 표현("보고됨", "주장됨") |
 | **⚠** | 추론·추측, 1차 source 없음 | "추정", "의심", "확인 필요" 만 |
@@ -162,7 +162,7 @@ cd external_reference && ./install.sh <타깃-프로젝트-루트> [도메인...
 도메인 특화 규칙(매뉴얼 taxonomy·보관 경로·인용 형식·흔한 추정 사례·자체 점검 grep)은 `domains/` 하위의 **도메인별 sub-file** 로 둔다. 도메인은 계속 추가되며, 해당 도메인 작업 시에만 선택 설치·참조한다.
 
 | sub-file | 도메인 | 트리거 예 |
-|---|---|---|
+| --- | --- | --- |
 | `domains/embedded-reference.md` | 임베디드 | `ISR(`, `NVIC_`, `IRQHandler`, FreeRTOS API, MCU datasheet/Family Manual |
 | `domains/ros2-reference.md` | ROS2 | `package.xml`, `rclpy`/`rclcpp`, `.launch.py`, REP 인용, sensor driver |
 | `domains/opencv.md` | OpenCV / Computer Vision | `cv2.`/`cv::`, `calibrateCamera`, distortion 모델, 카메라 calibration |
