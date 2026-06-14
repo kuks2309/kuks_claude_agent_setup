@@ -61,7 +61,8 @@ def find_violations(text):
     text = re.sub(r"https?://\S+", " ", text)
     out = []
     seen = set()
-    for m in re.finditer(r"\b([A-Z]{2,}[0-9]*)\b", text):
+    # 문자+숫자 식별자(MD060·STM32·ESP32 등)는 약자 아님 — 순수 대문자만 검출
+    for m in re.finditer(r"\b([A-Z]{2,})\b(?![0-9])", text):
         tok = m.group(1)
         if tok in WHITELIST or tok in seen:
             continue
