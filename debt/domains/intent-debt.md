@@ -21,6 +21,7 @@
 
 - coding **§3 사전승인**에서 ADR 누락 식별 → 등록
 - `user_instruction` 번들(지시 원문 기록)이 의도 부채의 1차 방어선 — 함께 설치 권장
+- (coding/user_instruction 미설치 시 해당 연계는 생략 — registry 의 '의도' 유형 등록은 단독 동작.)
 
 ## 자체 점검
 

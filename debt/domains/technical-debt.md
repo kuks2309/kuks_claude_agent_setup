@@ -22,6 +22,7 @@
 
 - 코드 `TODO`/`FIXME`/`HACK` → `debt-marker` 이빨(debt id 강제)
 - 중복 → coding `dup-signature` · 미흡 테스트 → coding `tests-ran` · 금지패턴 → coding `banned-pattern`
+- (coding 미설치 시 coding 이빨 연계는 생략 — debt 의 `debt-marker`·registry 는 단독 동작.)
 
 ## 자체 점검
 
