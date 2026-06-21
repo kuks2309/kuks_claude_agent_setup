@@ -26,6 +26,8 @@ cd debt && ./install.sh <타깃-프로젝트-루트>
 | **이해(understanding)** | 시스템·코드 이해 공백, "왜 되는지 모름", 미문서 동작 | §2 사전조사 |
 | **의도(intent)** | 결정 근거·의도 상실, 미기록 "왜" | §3 ADR(Architecture Decision Record) · `user_instruction` |
 
+각 부채의 **식별 신호·등록 항목·상환 전략 상세**는 `domains/{technical,understanding,intent}-debt.md`(설치 시 함께 복사).
+
 ## 2. 등록 (registry) — debt 가 양식 권위 SSOT
 
 - 위치: `docs/debt/registry.md`(단일 표) 또는 `docs/debt/<id>.md`(항목별).

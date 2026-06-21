@@ -19,10 +19,13 @@ TARGET="${1:-}"
 [ -d "$TARGET" ] || { echo "오류: 타깃 경로 없음: $TARGET"; exit 1; }
 
 DEST="$TARGET/docs/claude_guideline/$BUNDLE"
-mkdir -p "$DEST/checks"
+mkdir -p "$DEST/checks" "$DEST/domains"
 
-# 1) 규칙 + 이빨
+# 1) 규칙 + 도메인 + 이빨
 cp "$SRC/debt.md" "$DEST/debt.md"
+if ls "$SRC"/domains/*.md >/dev/null 2>&1; then
+  cp "$SRC"/domains/*.md "$DEST/domains/"; echo "✓ 도메인 $(ls "$SRC"/domains/*.md | wc -l | tr -d ' ')(기술·이해·의도) 복사"
+fi
 cp "$SRC"/checks/*.sh "$DEST/checks/"
 chmod +x "$DEST"/checks/*.sh
 echo "✓ 규칙 + 이빨 $(ls "$SRC"/checks/*.sh 2>/dev/null | wc -l | tr -d ' ') 복사 → docs/claude_guideline/$BUNDLE/"

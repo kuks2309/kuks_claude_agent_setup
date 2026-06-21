@@ -41,4 +41,4 @@ bash checks/debt-marker.sh ../../..  # 프로젝트 코드 마커 점검
 
 ## 파일
 
-`debt.md`(코어) · `checks/*.sh`(2) · `registry.template.md` · `install.sh` · `claude.snippet.md` · `.pre-commit-config.yaml` · `ci/debt-gates.yml`
+`debt.md`(코어) · `domains/{technical,understanding,intent}-debt.md` · `checks/*.sh`(2) · `registry.template.md` · `install.sh` · `claude.snippet.md` · `.pre-commit-config.yaml` · `ci/debt-gates.yml`
