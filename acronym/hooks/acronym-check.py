@@ -31,6 +31,13 @@ WHITELIST = {
     "CERT", "NASA", "JPL", "KC", "CE", "FCC", "UL", "PTP", "PEP", "LLVM", "GPL", "PSF",
     # 고유명사·조직 (대문자 표기)
     "FITO",
+    # RFC 2119 정규 키워드 (형식 리터럴 — 약자 아님)
+    "MUST", "SHOULD", "MAY", "SHALL", "NOT",
+    # 도구·명령 이름 (고정 명칭, OMC 와 동류)
+    "CCG",
+    # 프로그래밍·로그 리터럴 (대문자 영어 단어 — 약자 아님)
+    "PASS", "FAIL", "NULL", "NONE", "TRUE", "FALSE", "DONE", "GREEN", "RED",
+    "AND", "OR", "XOR",
 }
 
 
@@ -61,15 +68,16 @@ def find_violations(text):
     text = re.sub(r"```.*?```", " ", text, flags=re.S)
     text = re.sub(r"`[^`]*`", " ", text)
     text = re.sub(r"https?://\S+", " ", text)
+    # 본문 어디든 확장형(약자 바로 뒤 '(')이 한 번이라도 있으면 '도입된 약자'로 간주.
+    # 규칙은 "첫 등장 시 병기" — 이후 bare 사용은 허용이므로 위반 아님.
+    introduced = set(re.findall(r"\b([A-Z]{2,6})\(", text))
     out = []
     seen = set()
     # 약자는 보통 2~6자. 문자+숫자 식별자(MD060·STM32)와 7자+ 대문자 단어
     # (CODEOWNERS·UNVERIFIED·APPROVE 등)는 약자 아님 — 제외.
     for m in re.finditer(r"\b([A-Z]{2,6})\b(?![0-9])", text):
         tok = m.group(1)
-        if tok in WHITELIST or tok in seen:
-            continue
-        if text[m.end():m.end() + 1] == "(":  # 바로 뒤 ( → 병기됨
+        if tok in WHITELIST or tok in introduced or tok in seen:
             continue
         seen.add(tok)
         out.append(tok)
