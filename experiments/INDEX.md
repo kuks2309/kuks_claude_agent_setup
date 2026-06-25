@@ -34,7 +34,7 @@
 |------|------|------|------|------|------|------|
 | code_review | — | — | — | _(없음)_ | ⏳ | [번들](../code_review/experiments/) |
 | external_reference | — | — | — | _(없음)_ | ⏳ | [번들](../external_reference/experiments/) |
-| git_workflow | — | — | — | _(없음)_ | ⏳ | [번들](../git_workflow/experiments/) |
+| git_workflow | 2026-06-25 | L2 | SIL | install-idempotency | ✅ | [상세](../git_workflow/experiments/SIL/2026-06-25_install-idempotency/) |
 | issue_fix | — | — | — | _(없음)_ | ⏳ | [번들](../issue_fix/experiments/) |
 | sw_structure | — | — | — | _(없음)_ | ⏳ | [번들](../sw_structure/experiments/) |
 | user_instruction | — | — | — | _(없음)_ | ⏳ | [번들](../user_instruction/experiments/) |
@@ -46,6 +46,6 @@
 | 지표 | 값 |
 |------|-----|
 | 번들 수 | 9 (코드 3 + 설치 6) |
-| 단위 검증 완료 | 0 |
+| 단위 검증 완료 | 1 (git_workflow install-idempotency SIL) |
 | 통합 검증 완료 | 0 |
-| 마지막 갱신 | _(계획 수립 — 골격만)_ |
+| 마지막 갱신 | 2026-06-25 (git_workflow install.sh SIL — PASS) |
