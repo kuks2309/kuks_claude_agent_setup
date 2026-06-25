@@ -34,7 +34,7 @@ push·리뷰 방식이 모드에 따라 다르므로 작업 전 먼저 판정한
 
 - **명시 요청에만 commit/push** — "커밋"/"푸쉬"/"커밋 푸쉬" 자연어 트리거. 그 외 자동 commit/push 금지.
 - **작업 단위 = 커밋 = push 단위** — 서로 다른 scope 변경을 한 커밋에 섞지 않는다. dirty tree 는 scope 별 분할 커밋.
-- **명시 staging** — `git add <명시 경로>`. `git add -A` / `git add .` **금지**. commit 직전 `git diff --cached --name-only` 로 범위 검증.
+- **명시 staging (세션 격리)** — `git add <명시 경로>` 만. `git add -A` / `git add .` **금지**. 작업공간을 여러 세션이 공유하면 working tree 에 **타 세션의 미커밋 변경**이 섞일 수 있으므로 **이번 세션이 만든 파일만** staging 한다. commit 직전 `git diff --cached --name-only` 로 staged 범위가 이번 세션 산출물과 일치하는지 검증. 무관한 dirty 파일은 건드리지 않는다(모호하면 1줄 확인).
 - **커밋 메시지** — `type(scope): subject` (`feat`·`fix`·`docs`·`refactor`·`style`·`chore`·`test`). 한국어 본문 허용. `Co-Authored-By` 푸터.
 - **파괴 명령 승인** — `git push --force`·`reset --hard`·`clean -f`·브랜치 삭제는 사용자 명시 승인 후에만.
 - **push 전 확인** — secrets(`.env`·키·토큰·사설 IP(Internet Protocol)/MAC(Media Access Control)·운영 endpoint) 미포함, 대상 저장소 정확, vendored read-only 가드 파일 미staged.
@@ -74,7 +74,7 @@ CLAUDE.md/README 규칙은 **권고**이고, GitHub 설정은 **강제**한다. 
 ## 룰 (요약)
 
 1. 명시 요청에만 commit/push (트리거 "커밋"/"푸쉬")
-2. 작업 단위 = 커밋 단위, 명시 staging(`-A`/`.` 금지)
+2. 작업 단위 = 커밋 단위, 명시 staging·세션 격리(`-A`/`.` 금지, 이번 세션 산출물만)
 3. `type(scope): subject` + `Co-Authored-By`
 4. 다중 원격이면 모두 push
 5. 파괴 명령은 명시 승인
@@ -102,4 +102,4 @@ git log -1 --format='%s' | grep -E "^(feat|fix|docs|refactor|style|chore|test)(\
 
 ---
 
-**VERSION**: 1.0.0 (solo + team 모드, collaborator 자동 감지, 다중 원격 미러, GitHub 정책 강제(선택), code_review 리뷰 게이트 연계)
+**VERSION**: 1.1.0 (solo + team 모드, collaborator 자동 감지, 다중 원격 미러, GitHub 정책 강제(선택), code_review 리뷰 게이트 연계, 세션 격리 staging 명문화)
