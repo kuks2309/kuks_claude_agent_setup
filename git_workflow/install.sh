@@ -4,9 +4,10 @@
 # 사용법: ./install.sh <타깃-프로젝트-루트>
 #
 # 동작:
-#   1) git_workflow.md 를 <타깃>/docs/claude_guideline/git_workflow/ 로 복사
+#   1) git_workflow.md + hooks/*.py 를 <타깃>/docs/claude_guideline/git_workflow/ 로 복사
 #   2) claude.snippet.md 를 <타깃>/CLAUDE.md 에 append (마커 중복방지)
-#   설치 산출물은 규칙(git_workflow.md)뿐 — install.sh·claude.snippet.md 는 복사하지 않는다.
+#   3) reminder 훅(UserPromptSubmit) + track 훅(PostToolUse) 을 .claude/settings.json 에 멱등 등록
+#   설치 산출물은 규칙·훅뿐 — install.sh·claude.snippet.md 는 복사하지 않는다.
 
 set -euo pipefail
 
@@ -35,13 +36,13 @@ else
   echo "✓ CLAUDE.md 등록 추가"
 fi
 
-# 강제 훅 — 등록(수동 포인터)을 트리거 게이트로: 트리거 감지 시 규칙 SOP 주입
-HOOK_PY="$BUNDLE-reminder.py"
-if [ -f "$SRC/hooks/$HOOK_PY" ]; then
+# 훅 2종 — (1) reminder: 트리거 게이트로 SOP+세션 파일 주입(UserPromptSubmit)
+#          (2) track: 파일 수정 도구 사용 시 세션별 수정 파일 기록(PostToolUse)
+if ls "$SRC/hooks/"*.py >/dev/null 2>&1; then
   mkdir -p "$DEST/hooks"
-  cp "$SRC/hooks/$HOOK_PY" "$DEST/hooks/$HOOK_PY"
-  chmod +x "$DEST/hooks/$HOOK_PY" 2>/dev/null || true
-  echo "✓ 훅 복사: docs/claude_guideline/$BUNDLE/hooks/$HOOK_PY"
+  cp "$SRC/hooks/"*.py "$DEST/hooks/"
+  chmod +x "$DEST/hooks/"*.py 2>/dev/null || true
+  echo "✓ 훅 복사: docs/claude_guideline/$BUNDLE/hooks/*.py"
   PYBIN=""
   for c in python3 python; do
     if command -v "$c" >/dev/null 2>&1; then PYBIN="$c"; break; fi
@@ -52,24 +53,35 @@ if [ -f "$SRC/hooks/$HOOK_PY" ]; then
     mkdir -p "$TARGET/.claude"
     SETTINGS="$TARGET/.claude/settings.json"
     [ -f "$SETTINGS" ] && cp "$SETTINGS" "$SETTINGS.bak" && echo "✓ 백업: .claude/settings.json.bak"
-    HOOK_CMD="$PYBIN \"\$CLAUDE_PROJECT_DIR/docs/claude_guideline/$BUNDLE/hooks/$HOOK_PY\""
-    "$PYBIN" - "$SETTINGS" "$HOOK_CMD" <<'PYEOF'
+    HOOK_BASE="\$CLAUDE_PROJECT_DIR/docs/claude_guideline/$BUNDLE/hooks"
+    REMINDER_CMD="$PYBIN \"$HOOK_BASE/$BUNDLE-reminder.py\""
+    TRACK_CMD="$PYBIN \"$HOOK_BASE/$BUNDLE-track.py\""
+    "$PYBIN" - "$SETTINGS" "$REMINDER_CMD" "$TRACK_CMD" <<'PYEOF'
 import json, sys
-settings_path, cmd = sys.argv[1], sys.argv[2]
+settings_path, reminder_cmd, track_cmd = sys.argv[1], sys.argv[2], sys.argv[3]
 try:
     with open(settings_path, encoding="utf-8") as f:
         cfg = json.load(f)
 except (FileNotFoundError, json.JSONDecodeError):
     cfg = {}
-groups = cfg.setdefault("hooks", {}).setdefault("UserPromptSubmit", [])
-exists = any(h.get("command") == cmd for g in groups for h in g.get("hooks", []))
-if exists:
-    print("• settings.json UserPromptSubmit 훅 이미 존재 — 스킵")
-else:
-    groups.append({"hooks": [{"type": "command", "command": cmd, "timeout": 5}]})
-    with open(settings_path, "w", encoding="utf-8") as f:
-        json.dump(cfg, f, ensure_ascii=False, indent=2)
-    print("✓ settings.json UserPromptSubmit 훅 등록")
+hooks = cfg.setdefault("hooks", {})
+
+def register(event, cmd, matcher=None):
+    groups = hooks.setdefault(event, [])
+    if any(h.get("command") == cmd for g in groups for h in g.get("hooks", [])):
+        print("• settings.json %s 훅 이미 존재 — 스킵" % event)
+        return
+    entry = {"hooks": [{"type": "command", "command": cmd, "timeout": 5}]}
+    if matcher:
+        entry["matcher"] = matcher
+    groups.append(entry)
+    print("✓ settings.json %s 훅 등록" % event)
+
+register("UserPromptSubmit", reminder_cmd)
+register("PostToolUse", track_cmd, matcher="Write|Edit|MultiEdit|NotebookEdit")
+
+with open(settings_path, "w", encoding="utf-8") as f:
+    json.dump(cfg, f, ensure_ascii=False, indent=2)
 PYEOF
   fi
 fi
