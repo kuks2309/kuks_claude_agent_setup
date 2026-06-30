@@ -12,6 +12,7 @@ self-contained: OMC 등 외부 도구 비의존. session_id·git-dir 는 Claude 
 """
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -45,6 +46,32 @@ def _git(cwd, *args):
     except (OSError, subprocess.SubprocessError):
         pass
     return None
+
+
+MODE_RE = re.compile(r"git\s*협업\s*모드\s*:\s*(solo|team)", re.IGNORECASE)
+
+
+def mode_section(cwd):
+    """README → CLAUDE.md 순으로 협업 모드 선언을 찾는다. 없으면 문의·기록 강제."""
+    if not cwd:
+        return ""
+    for fn in ("README.md", "CLAUDE.md"):
+        try:
+            with open(os.path.join(cwd, fn), encoding="utf-8") as f:
+                m = MODE_RE.search(f.read())
+        except OSError:
+            continue
+        if m:
+            return (
+                "\n\n[협업 모드] {fn} 선언: **{mode}**. 이 모드의 push·리뷰 정책을 따르세요."
+            ).format(fn=fn, mode=m.group(1).lower())
+    return (
+        "\n\n[협업 모드 — 미선언, 진행 전 필수]\n"
+        "README.md·CLAUDE.md 에 `git 협업 모드: solo|team` 선언이 없습니다. "
+        "**자동 solo default 금지** — 먼저 사용자에게 solo/team 을 문의하고, 답을 README.md 에 "
+        "`git 협업 모드: <solo|team>` 으로 기록한 뒤 그 모드로 작업하세요. "
+        "(GitHub collaborator·CODEOWNERS·branch protection 자동 감지를 제안 근거로 활용 가능.)"
+    )
 
 
 def session_section(cwd, session_id):
@@ -98,7 +125,7 @@ def main():
     if cwd and not os.path.isfile(os.path.join(cwd, *RULE_MD.split("/"))):
         return
 
-    print(DIRECTIVE + session_section(cwd, data.get("session_id", "")))
+    print(DIRECTIVE + mode_section(cwd) + session_section(cwd, data.get("session_id", "")))
 
 
 if __name__ == "__main__":

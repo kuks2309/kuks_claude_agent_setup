@@ -14,21 +14,24 @@ cd git_workflow && ./install.sh <타깃-프로젝트-루트>
 
 스크립트가 `git_workflow.md` 를 `docs/claude_guideline/git_workflow/` 로 복사하고 등록 스니펫을 타깃 `CLAUDE.md` 에 append 한다. **활성화 게이트**: 본 파일이 그 경로에 없으면 본 룰 비활성.
 
-## 0. 모드 판정 (solo vs team)
+## 0. 모드 판정 (solo vs team) — README 기록 우선
 
-push·리뷰 방식이 모드에 따라 다르므로 작업 전 먼저 판정한다. 우선순위:
+push·리뷰 방식이 모드에 갈리므로 **작업 전 먼저 판정**한다. 모드는 **기록된 선언이 권위**이며, 자동 감지는 *제안용*일 뿐 단독으로 확정하지 않는다. 우선순위:
 
-1. **명시 선언 (최우선)** — 타깃 `CLAUDE.md` 의 `git 협업 모드: solo|team` 줄. 있으면 그대로 따른다.
-2. **자동 감지 (선언 없을 때)** — 하나라도 해당하면 **team**:
-   - **GitHub collaborator 2명 이상 (가장 권위 있음)**: `gh api repos/<owner>/<repo>/collaborators --jq 'length'`. collaborator 는 "작업 권한이 있는 사람" 전체라 초기 단계에서도 정확. **원격마다 다를 수 있으니 각 원격을 확인**한다.
-   - `CODEOWNERS` 파일 존재, 또는 `main` 브랜치 보호 활성 (`gh api repos/<owner>/<repo>/branches/main/protection`)
-   - (gh 불가 시 fallback) 최근 50 커밋 author 이메일 2개 이상: `git log -50 --format='%ae' | sort -u | wc -l`
-   - 사용자가 "팀/회사/공유/여러 명" 맥락 언급
-3. **기본값** — 위 신호 없으면 **solo**. 단 공유 저장소면 `CLAUDE.md` 에 `git 협업 모드: team` 명시 권장.
+1. **README 선언 (최우선)** — 저장소 `README.md` 의 `git 협업 모드: solo|team` 줄. 있으면 그대로 따른다. 사람이 보는 README 가 1차 기록처다.
+2. **CLAUDE.md 선언 (fallback)** — README 에 없고 `CLAUDE.md` 에 `git 협업 모드: solo|team` 이 있으면 따른다(기존 설치 호환).
+3. **미선언 시 (필수 절차 — 자동 default 금지)** — 둘 다 없으면 **solo 로 임의 진행하지 않는다.** 사용자에게 solo/team 을 1줄 문의 → 답을 `README.md` 에 `git 협업 모드: <solo|team>` 으로 **기록** → 그 모드로 진행한다. 문의 시 아래 자동 감지를 *제안 근거*로 제시한다.
+
+**자동 감지 (제안 근거 — 확정 아님)** — 하나라도 해당하면 team 후보로 사용자에게 제안:
+
+- **GitHub collaborator 2명 이상**: `gh api repos/<owner>/<repo>/collaborators --jq 'length'`. collaborator 는 "작업 권한이 있는 사람" 전체라 초기 단계에서도 정확. **원격마다 다를 수 있으니 각 원격을 확인**한다.
+- `CODEOWNERS` 파일 존재, 또는 `main` 브랜치 보호 활성 (`gh api repos/<owner>/<repo>/branches/main/protection`)
+- (gh 불가 시) 최근 50 커밋 author 이메일 2개 이상: `git log -50 --format='%ae' | sort -u | wc -l`
+- 사용자가 "팀/회사/공유/여러 명" 맥락 언급
 
 **원격별 모드 (미러 주의)** — 미러 원격마다 collaborator 가 다르면 각 원격은 그 모드를 따른다. 한 원격이라도 team 이면 그 원격 `main` 직접 push 가 팀 PR·리뷰·권한 정책을 우회하지 않는지 확인한다. **단, 관리자가 운영하는 단방향 미러 원격**(팀의 활성 개발 대상이 아님)은 직접 push 를 **문서화된 예외**로 허용할 수 있다 — 누가 관리자이고 어느 원격이 미러인지 명시한다. (예: `origin`=solo, `fito`=collaborator 다수지만 관리자 단방향 미러 → `main` 직접 push 예외.)
 
-판정이 모호하면 사용자에게 1줄 확인.
+모드가 바뀌면(예: solo→team 전환) `README.md` 선언을 갱신한다. 판정이 모호하면 사용자에게 1줄 확인.
 
 ## 1. 공통 규칙 (solo·team 둘 다)
 
@@ -74,6 +77,7 @@ CLAUDE.md/README 규칙은 **권고**이고, GitHub 설정은 **강제**한다. 
 
 ## 룰 (요약)
 
+0. **작업 전 협업 모드 확인** — `README.md` 의 `git 협업 모드: solo|team` 선언 우선(없으면 `CLAUDE.md`), 둘 다 없으면 사용자 문의 후 README 기록(자동 default 금지)
 1. 명시 요청에만 commit/push (트리거 "커밋"/"푸쉬")
 2. 작업 단위 = 커밋 단위, 명시 staging·세션 격리(`-A`/`.` 금지, 이번 세션 산출물만)
 3. `type(scope): subject` + `Co-Authored-By`
@@ -86,8 +90,9 @@ CLAUDE.md/README 규칙은 **권고**이고, GitHub 설정은 **강제**한다. 
 ## 자체 점검
 
 ```bash
-# 모드 선언 확인 (team 공유 저장소 권장)
-grep -E "git 협업 모드: (solo|team)" CLAUDE.md || echo "(모드 미선언 — 자동 감지)"
+# 모드 선언 확인 — README 우선, CLAUDE.md fallback (미선언 시 문의·기록)
+grep -hE "git 협업 모드: (solo|team)" README.md CLAUDE.md 2>/dev/null \
+  || echo "(모드 미선언 — 자동 default 금지: 사용자 문의 후 README 에 기록)"
 
 # 모드 자동 감지 — GitHub collaborator 수 (≥2 → team), 원격별 확인
 for r in $(git remote); do
@@ -103,4 +108,4 @@ git log -1 --format='%s' | grep -E "^(feat|fix|docs|refactor|style|chore|test)(\
 
 ---
 
-**VERSION**: 1.2.0 (solo + team 모드, collaborator 자동 감지, 다중 원격 미러, GitHub 정책 강제(선택), code_review 리뷰 게이트 연계, 세션 격리 staging 명문화, 세션 격리 자동 추적 훅(PostToolUse track + reminder 주입))
+**VERSION**: 1.3.0 (solo + team 모드, README 모드 기록 우선·미선언 시 문의·기록(자동 default 금지), collaborator 자동 감지(제안용), 다중 원격 미러, GitHub 정책 강제(선택), code_review 리뷰 게이트 연계, 세션 격리 staging 명문화, 세션 격리 자동 추적 훅(PostToolUse track + reminder 주입))

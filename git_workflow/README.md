@@ -12,12 +12,13 @@ cd git_workflow && ./install.sh <타깃-프로젝트-루트>
 
 ## 모드 (solo vs team)
 
-push·리뷰 방식이 모드에 갈리므로 작업 전 먼저 판정한다 (→ `git_workflow.md` §0).
+push·리뷰 방식이 모드에 갈리므로 작업 전 먼저 판정한다 (→ `git_workflow.md` §0). **모드는 기록된 선언이 권위** — 저장소 `README.md` 의 `git 협업 모드: solo|team` 줄이 최우선, 없으면 `CLAUDE.md` 선언, **둘 다 없으면 사용자에게 문의 후 README 에 기록**한다(자동 default 금지). 자동 감지는 *문의 시 제안 근거*일 뿐 단독 확정하지 않는다.
 
-| 모드 | 판정 신호 | push 방식 |
+| 모드 | 기록 / 신호 | push 방식 |
 | --- | --- | --- |
-| **solo** | 신호 없음(기본값) | `main` 직접 commit + push (다중 원격이면 모두) |
-| **team** | collaborator ≥2 · CODEOWNERS · `main` 보호 · 다중 author · "팀/공유" 맥락 | `main` 직접 push 금지 → 브랜치 → PR → 리뷰 ≥1 → merge |
+| **solo** | README/CLAUDE.md 에 `git 협업 모드: solo` | `main` 직접 commit + push (다중 원격이면 모두) |
+| **team** | README/CLAUDE.md 에 `git 협업 모드: team` (제안 근거: collaborator ≥2 · CODEOWNERS · `main` 보호 · 다중 author · "팀/공유" 맥락) | `main` 직접 push 금지 → 브랜치 → PR → 리뷰 ≥1 → merge |
+| **미선언** | 위 선언 없음 | **진행 전 사용자 문의 → README 기록** (solo 임의 진행 금지) |
 
 **원격별 판정** — 미러 원격마다 collaborator 가 다르면 각 원격이 그 모드를 따른다. **관리자 단방향 미러**(예: `fito`)는 직접 push 를 문서화된 예외로 허용 가능.
 
