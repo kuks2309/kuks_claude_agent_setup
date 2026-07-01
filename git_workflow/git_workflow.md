@@ -39,6 +39,7 @@ push·리뷰 방식이 모드에 갈리므로 **작업 전 먼저 판정**한다
 - **작업 단위 = 커밋 = push 단위** — 서로 다른 scope 변경을 한 커밋에 섞지 않는다. dirty tree 는 scope 별 분할 커밋.
 - **명시 staging (세션 격리)** — `git add <명시 경로>` 만. `git add -A` / `git add .` **금지**. 작업공간을 여러 세션이 공유하면 working tree 에 **타 세션의 미커밋 변경**이 섞일 수 있으므로 **이번 세션이 만든 파일만** staging 한다. commit 직전 `git diff --cached --name-only` 로 staged 범위가 이번 세션 산출물과 일치하는지 검증. 무관한 dirty 파일은 건드리지 않는다(모호하면 1줄 확인).
 - **세션 격리 자동화 (설치 시)** — `hooks/git_workflow-track.py`(PostToolUse) 가 이 세션이 수정한 파일을 `.git/git_workflow/sessions/<session_id>/touched` 에 누적하고, `hooks/git_workflow-reminder.py`(UserPromptSubmit) 가 git 트리거 시 그 목록을 주입한다 → staging 대상이 '이 세션 목록'으로 자동 grounding 된다(`.git` 내부라 비-커밋·세션별 분리). python 부재 시 이 자동화는 생략되고 규칙 텍스트만 생존(수동 식별).
+- **세션 격리 강제 (staging 게이트)** — `hooks/git_workflow-stage-gate.py`(PreToolUse·Bash) 가 `git add`/`git commit -a` 를 실행 직전 검사해 **하드 차단(deny)**: 광역 staging(`-A`/`.`/`-u`/`-p`)·`git commit -a`·glob 경로, 그리고 이 세션 touched 목록에 없는 **타 세션/미추적 파일**. 멀티 세션이 working tree 를 공유할 때(예: 한 창의 다중 탭) 타 세션 미커밋 파일 **캡처를 능동 차단**한다. 정당한 예외(Bash 산출물 등)는 명령에 `# gw:allow-foreign` 또는 env `GW_ALLOW_FOREIGN=1` 로 우회. **한계(정직)**: 셸 파싱 휴리스틱(`eval`·`xargs`·git alias·`cd &&` 우회 가능), 훅 미설치 세션은 미보호, Bash 로만 만든 파일은 미추적→override 필요, `git commit <path>` 미검사.
 - **커밋 메시지** — `type(scope): subject` (`feat`·`fix`·`docs`·`refactor`·`style`·`chore`·`test`). 한국어 본문 허용. `Co-Authored-By` 푸터.
 - **파괴 명령 승인** — `git push --force`·`reset --hard`·`clean -f`·브랜치 삭제는 사용자 명시 승인 후에만.
 - **push 전 확인** — secrets(`.env`·키·토큰·사설 IP(Internet Protocol)/MAC(Media Access Control)·운영 endpoint) 미포함, 대상 저장소 정확, vendored read-only 가드 파일 미staged.
@@ -108,4 +109,4 @@ git log -1 --format='%s' | grep -E "^(feat|fix|docs|refactor|style|chore|test)(\
 
 ---
 
-**VERSION**: 1.3.0 (solo + team 모드, README 모드 기록 우선·미선언 시 문의·기록(자동 default 금지), collaborator 자동 감지(제안용), 다중 원격 미러, GitHub 정책 강제(선택), code_review 리뷰 게이트 연계, 세션 격리 staging 명문화, 세션 격리 자동 추적 훅(PostToolUse track + reminder 주입))
+**VERSION**: 1.4.0 (solo + team 모드, README 모드 기록 우선·미선언 시 문의·기록(자동 default 금지), collaborator 자동 감지(제안용), 다중 원격 미러, GitHub 정책 강제(선택), code_review 리뷰 게이트 연계, 세션 격리 staging 명문화, 세션 격리 자동 추적 훅(PostToolUse track + reminder 주입), 세션 격리 강제 staging 게이트(PreToolUse Bash — 타 세션 파일 캡처 하드 차단 + override))
