@@ -10,6 +10,28 @@ cd git_workflow && ./install.sh <타깃-프로젝트-루트>
 
 `git_workflow.md` + `hooks/` 를 `docs/claude_guideline/git_workflow/` 로 복사, `CLAUDE.md` 에 등록 스니펫 append, 타깃 `.claude/settings.json` 에 UserPromptSubmit(reminder)·PostToolUse(track)·PreToolUse(stage-gate) 훅 등록(python 있을 때). **활성화 게이트**: 본 파일이 그 경로에 없으면 룰 비활성. **설치 산출물은 규칙·훅뿐** — `install.sh`·`claude.snippet.md`·`README.md` 는 복사하지 않는다.
 
+## 이관 (타 프로젝트) — 설치·검증
+
+본 번들은 **self-contained**(외부 도구·상대경로 의존 0)라 폴더째 옮겨 설치한다.
+
+```bash
+# 1) 이관 — git_workflow/ 폴더를 대상(또는 자산 저장소)에 두거나, 소스에서 바로 실행
+./git_workflow/install.sh /path/to/other-project      # 어디서 실행하든 $SRC 기준
+
+# 2) 설치 검증 (대상 프로젝트에서)
+ls  /path/to/other-project/docs/claude_guideline/git_workflow/hooks/   # reminder+track+stage-gate 3종
+grep -c 'kuks_agent_setup:git_workflow' /path/to/other-project/CLAUDE.md   # 1
+python3 - <<'PY'
+import json; h=json.load(open('/path/to/other-project/.claude/settings.json'))['hooks']
+print({k:[g.get('matcher','-') for g in v] for k,v in h.items() if k in ('UserPromptSubmit','PostToolUse','PreToolUse')})
+PY
+```
+
+- **멱등** — 재실행 안전(규칙 덮어쓰기, 마커·훅 "스킵", `settings.json` `.bak` 백업). **갱신 = 재설치**.
+- **python 부재** — 훅 등록만 생략(경고), 규칙 파일은 설치됨(강제력 0으로 정직 강등).
+- **첫 실행 시 모드** — 대상에 `git 협업 모드` 선언이 없으면 reminder 훅이 문의·기록을 강제(§0) → 대상 `README.md`/`CLAUDE.md` 에 선언.
+- **비-git 대상** — 규칙·스니펫은 설치되나 track/gate 는 git 저장소에서만 발화(그 외 no-op).
+
 ## 모드 (solo vs team)
 
 push·리뷰 방식이 모드에 갈리므로 작업 전 먼저 판정한다 (→ `git_workflow.md` §0). **모드는 기록된 선언이 권위** — 저장소 `README.md` 의 `git 협업 모드: solo|team` 줄이 최우선, 없으면 `CLAUDE.md` 선언, **둘 다 없으면 사용자에게 문의 후 README 에 기록**한다(자동 default 금지). 자동 감지는 *문의 시 제안 근거*일 뿐 단독 확정하지 않는다.
