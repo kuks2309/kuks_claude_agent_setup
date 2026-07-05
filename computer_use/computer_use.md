@@ -72,4 +72,16 @@ rm -f  ~/.claude/agents/computer-operator.md
 ## 검증
 
 - SIL(단위, 마우스 미동작): `cd computer_use && python3 -m pytest experiments/SIL -q`
-- HIL(실기, 실제 조작): `experiments/HIL/_template/` 참조.
+- HIL(실기, 실제 조작): `experiments/HIL/_template/` 참조. 실증 사례: `experiments/HIL/2026-07-05_chrome-navigate/`(크롬→example.com, PASS).
+
+## 미검증 / 한계
+
+- **`install.ps1`(Windows) 미검증** — 개발 환경이 Linux 라 실행 확인 못 함.
+  Windows 머신에서 `-Check`(preflight)·실배치 확인 후 `experiments/HIL` 에 기록 필요.
+- **2단계 독립 앱은 stub** — `app/README.md` 골격만. Anthropic Messages API +
+  `computer_20250124` 도구 loop 는 미구현(후속).
+- **좌표 자동검출 미구현** — 주소창·버튼 위치는 현재 모델이 캡처를 보고 수동
+  산출. 자동 검출(템플릿 매칭/OCR) 보조는 후속.
+- **z-order 주의** — 상위에 다른 창이 덮이면 입력이 엉뚱한 창에 갈 수 있어,
+  조작 전 대상 창을 raise/activate 해야 함(스킬·에이전트에 반영됨). 근거:
+  `experiments/HIL/2026-07-05_chrome-navigate/` §발견.

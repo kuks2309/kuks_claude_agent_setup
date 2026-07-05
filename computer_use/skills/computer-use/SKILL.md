@@ -30,12 +30,23 @@ arguments:
 ### Step 1: 목표 확인
 `goal` 인자가 있으면 그대로, 없으면 사용자에게 무엇을 시킬지 묻는다.
 
-### Step 2: 화면 읽기 (캡처)
-전체 화면을 네이티브 해상도로 캡처한다(모델 출력 좌표 = 화면 절대 좌표 1:1).
+### Step 2: 대상 창 준비 + 화면 읽기 (캡처)
+**먼저 조작할 대상 앱 창을 앞으로 올린다(raise/activate).** 상위에 다른 창이
+덮여 있으면(z-order) 이후 클릭·타이핑이 **엉뚱한 창에 들어갈 수 있다**. 대상
+창을 `--mode window` 로 캡처하면 캡처 전 그 창을 자동으로 앞으로 올린다(창 id
+는 `--mode list` 로 확인).
 
 ```bash
+# 대상 창을 앞으로 올리며 캡처 (권장)
+python3 ~/.claude/capture_screen.py --mode list                      # 창 id 확인
+python3 ~/.claude/capture_screen.py --mode window --window-id 0x... --label "cu_step"
+# 또는 전체 화면 (대상 창이 이미 최상위·포커스임이 확실할 때)
 python3 ~/.claude/capture_screen.py --mode full --label "cu_step"
 ```
+
+좌표는 화면 절대 좌표(전체화면 1:1; 창 모드는 창 offset 을 더함). 포커스를
+명시적으로 주려면 `xdotool windowactivate <id>`. 조작 후 Step 5 재캡처의 화면
+변화로 대상 창이 맞았는지 반드시 재확인한다.
 
 ### Step 3: 분석 + 다음 action 결정
 Read 도구로 캡처 이미지를 읽고 목표 대비 현재 화면을 분석한다. 다음 한
@@ -79,3 +90,5 @@ Step 2 와 동일하게 재캡처하고 Read 로 비교한다. "실행한 동작
 - Windows: `pyautogui` 필요.
 - 설치: 번들의 `install.sh`(Linux/macOS) 또는 `install.ps1`(Windows). 전역
   `~/.claude` 설치이므로 어느 프로젝트에서든 사용 가능.
+- **사용 전 install.sh 선행 필요** — 스킬은 `~/.claude/computer_action.py`·
+  `~/.claude/capture_screen.py` 를 참조하므로 미설치 시 "파일 없음"으로 실패한다.
