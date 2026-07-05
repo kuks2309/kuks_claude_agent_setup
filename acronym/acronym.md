@@ -31,6 +31,8 @@ cd acronym && ./install.sh
 
 스크립트가 (1) 규칙·검토 훅을 `~/.claude/acronym/` 로 복사, (2) 등록 스니펫을 `~/.claude/CLAUDE.md` 에 append, (3) `~/.claude/settings.json` 에 Stop 검토 훅 1종을 멱등 등록한다 (기존 설정 보존, 사전 백업). 옛 훅(`acronym-reminder.sh`·`acronym-check.py`)이 남아 있으면 파일·등록을 함께 정리한다.
 
+제거는 설치의 역인 `./uninstall.sh` 로 한다 — settings.json 훅 등록·CLAUDE.md 스니펫·`~/.claude/acronym/` 파일을 외과적으로 제거한다 (사전 백업, 멱등). `.bak` 로 복원하지 않는다 (옛 구성 부활 방지).
+
 ## 5. 적용 방식
 
 규칙 적용은 두 층이다.
