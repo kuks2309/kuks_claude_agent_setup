@@ -1,2 +1,2 @@
 <!-- kuks_agent_setup:user_instruction -->
-- 사용자 지시 도착 시(상시) **응답 전 의무**: 먼저 docs/claude_guideline/user_instruction/recording.md 규칙에 따라 지시 원문을 docs/user_instructions/user_instructions.md 맨 위에 즉시 prepend 기록한다(작업 후 일괄 금지, 원문만·분석 금지).
+- 사용자 지시는 UserPromptSubmit hook 이 이 세션 전용 파일(docs/user_instructions/sessions/{session_id}.md)에 자동 기록하고 SessionEnd 에 단일 누적 로그(docs/user_instructions/user_instructions.md)로 병합한다(규칙: docs/claude_guideline/user_instruction/recording.md). 모델은 다른 세션 기록·병합 로그를 현재 작업 소스로 읽지 않는다(세션 격리).
