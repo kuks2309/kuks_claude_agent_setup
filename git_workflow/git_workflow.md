@@ -50,6 +50,24 @@ push·리뷰 방식이 모드에 갈리므로 **작업 전 먼저 판정**한다
 - `main`(또는 현재 추적 분기) **직접 commit + push**. PR(Pull Request) 미사용.
 - 다중 원격이면: `git push origin main && git push fito main`.
 
+### 2-1. 세션별 브랜치 관례 (solo + 다중 세션 공유 워킹트리 — 선택)
+
+여러 세션(예: 한 창의 다중 탭)이 **같은 저장소·워킹트리·`main` 을 공유**하면, 각 세션 커밋이 공유 `main` 위에 교차되어 이력 추적·동시 push 충돌 관리가 어렵다. 이때 아래 경량 관례를 적용해 세션 산출물을 이력상 격리한다. **solo 모드 선언은 유지**(§0 불변)하되, 각 세션은 `main` 에 직접 push 하지 않고 자기 브랜치로 격리하고, `main` 반영(merge)은 **사용자가 수행**한다.
+
+> **⚠ 공유 HEAD 주의 — `git switch` 금지, `git worktree` 사용.** 다중 세션이 **하나의 워킹트리·하나의 HEAD** 를 공유하므로(`git worktree list` 로 단일 트리 확인) `git switch`/`git checkout -b` 로 브랜치를 바꾸면 HEAD 가 **전역 이동**해 동시에 작업 중인 **다른 세션까지 그 브랜치로 끌려간다**. 반드시 별도 링크드 워킹트리(`git worktree add`)를 만들어 그 안에서만 브랜치를 다룬다 — 공유 트리의 HEAD 는 불변.
+
+- **적용 조건** — 다중 세션이 워킹트리를 공유할 때만(`git worktree list` 가 트리 1개 + 다른 세션이 같은 트리를 수정). 단일 세션이면 §2 기본(main 직접 push)으로 충분.
+- **브랜치 명명** — `session/<session-id>` (예: `session/6c0ee226`). 식별자는 세션 격리 훅(`git_workflow-reminder.py`)이 주입하는 `<session_id>` 를 쓴다.
+- **격리 대상 = 이 세션의 산출물만** — **공유 가변 로그**(`docs/user_instructions/user_instructions.md` 등 모든 세션이 append 하는 파일)는 세션 브랜치에 넣지 않는다(브랜치마다 다른 스냅샷 → merge 충돌). 그런 로그는 `main` 에 직접 커밋(§2)하거나 로그 소유 세션이 일괄 커밋한다. 세션 브랜치에는 **그 세션만 만든 코드·문서 산출물**만 담는다.
+- **작업 흐름 (worktree)** —
+  1. `git worktree add <경로>/kkw-session-<id> -b session/<id>` (공유 HEAD 불변, main 기준 새 브랜치).
+  2. 이 세션 산출물을 그 worktree 로 반영 후 `cd` 하여 §1 규칙대로 커밋(명시 staging·`type(scope): subject`+`Co-Authored-By`).
+  3. `git -C <경로> push -u origin session/<id>` — **`main` 직접 push 안 함**(다중 원격이면 각 원격에).
+  4. `git worktree remove <경로>` 로 링크드 트리 정리.
+- **merge (사용자 소관)** — 세션 브랜치를 `main` 에 반영하는 merge 는 **사용자가 수행**한다. Claude 자동 merge 금지. 사용자가 `git merge --no-ff session/<id>` 또는 원격 UI 로 처리.
+- **정리** — merge 후 `git branch -d session/<id>` + `git push origin --delete session/<id>` (브랜치 삭제는 §1 파괴 명령 — 사용자 명시 승인 후).
+- **team 과의 구분** — 본 관례는 §3 team 의 PR·리뷰 승인 게이트를 도입하지 **않는다**. 브랜치 목적은 협업 리뷰가 아니라 **세션 이력 격리·동시 push 충돌 방지**뿐. team 의 self-merge 금지(§3)는 여기 해당 없음 — merge 주체가 사용자다.
+
 ## 3. team 모드 (여럿)
 
 - **`main` 직접 push 금지.** `<type>/<topic>` 브랜치에서 작업(예: `feat/git-workflow`), 짧게 유지.
@@ -109,4 +127,4 @@ git log -1 --format='%s' | grep -E "^(feat|fix|docs|refactor|style|chore|test)(\
 
 ---
 
-**VERSION**: 1.4.0 (solo + team 모드, README 모드 기록 우선·미선언 시 문의·기록(자동 default 금지), collaborator 자동 감지(제안용), 다중 원격 미러, GitHub 정책 강제(선택), code_review 리뷰 게이트 연계, 세션 격리 staging 명문화, 세션 격리 자동 추적 훅(PostToolUse track + reminder 주입), 세션 격리 강제 staging 게이트(PreToolUse Bash — 타 세션 파일 캡처 하드 차단 + override))
+**VERSION**: 1.5.0 (1.4.0 + §2-1 세션별 브랜치 관례(solo 다중세션 공유 워킹트리 — `session/<id>` 브랜치 커밋·push, main merge 는 사용자 소관, team PR·리뷰 게이트 미도입))
