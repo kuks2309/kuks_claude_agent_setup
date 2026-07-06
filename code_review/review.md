@@ -14,7 +14,7 @@ cd code_review && ./install.sh <타깃-프로젝트-루트> [도메인...]
 
 스크립트가 코어(`review.md`)를 `docs/claude_guideline/code_review/` 로, 선택한 도메인(`domains/<도메인>.md`)을 `.../code_review/domains/` 로 복사하고, 등록 스니펫을 타깃 `CLAUDE.md` 에 append 한다 (덮어쓰기 아님).
 
-- **리뷰 산출물**: `docs/code_review/<주제>/YYYY-MM-DD.md` (날짜=버전) — 폴더·파일 없으면 만든다(승인 불요). 주제 폴더에 타임라인 인덱스 `README.md` 동반.
+- **리뷰 산출물**: `docs/code_review/<주제>/YYYY-MM-DD.md` (날짜=버전) — 폴더·파일 없으면 만든다(승인 불요). 주제 폴더에 타임라인 인덱스 `README.md` 동반. **루트 정본 + 패키지 병기 이중 기록**(→ [기록 위치](#기록-위치--버전-관리-날짜-기반) 의 병기 규칙).
 - **활성화 게이트**: 본 파일이 `docs/claude_guideline/code_review/review.md` 경로에 없으면 본 SOP 는 비활성.
 
 ## 트리거
@@ -194,12 +194,23 @@ Verdict: REQUEST CHANGES
 
 **위치**: `docs/code_review/<주제>/YYYY-MM-DD.md` (`<주제>` = 대상 파일명/모듈명/패키지명). 같은 날 재요청은 `YYYY-MM-DD-HHMM.md`. 폴더·파일 없으면 만든다(승인 불요). **날짜가 곧 버전.**
 
+**이중 기록 (루트 정본 + 패키지 병기, 의무)** — 리뷰 산출물은 **두 곳에 동일 내용으로 병기**한다:
+
+| 사본 | 경로 | 권위 |
+| --- | --- | --- |
+| **루트 정본 (canonical)** | `docs/code_review/<주제>/YYYY-MM-DD.md` (+ `README.md` 인덱스) | 정본 — 자체 점검·타임라인 인덱스의 권위 |
+| **패키지 병기 (mirror)** | `<패키지루트>/docs/code_review/<주제>/YYYY-MM-DD.md` (+ `README.md` 인덱스) | 사본 — 코드와 같은 위치에서 열람 |
+
+- `<패키지루트>` = 리뷰 대상 파일이 속한 패키지/툴 루트(예: `tools/capture_image/`, `Welding_Robot_Ros2_ws/src/<pkg>/`). ROS2 패키지는 `package.xml`, 그 외는 대상 파일이 속한 최상위 도구/모듈 디렉토리로 식별.
+- 두 사본은 **동일 내용**을 유지한다(정본 수정 시 병기본 동기화). 소스 참조는 위치 의존 링크 대신 저장소 루트 기준 `파일:line` 평문을 권장(양쪽 사본 동일 유지).
+- **패키지 루트를 특정할 수 없을 때**(리뷰 대상이 저장소 루트 전반·다중 패키지 횡단) → 루트 정본만 기록(병기 생략, 무해).
+
 **코드 버전 고정 (의무)** — 각 날짜 파일 헤더에 리뷰한 코드 상태를 박는다 (없으면 어느 코드를 리뷰했는지 추적 불가):
 
 - git: 리뷰 커밋 `<short-hash>` + 브랜치 + (있으면) PR(Pull Request) 번호
 - 비-git: 대상 파일 내용 해시 + 일자
 
-**타임라인 인덱스** — `docs/code_review/<주제>/README.md` 에 날짜·코드 버전·Verdict 표(최신 위):
+**타임라인 인덱스** — `docs/code_review/<주제>/README.md` 에 날짜·코드 버전·Verdict 표(최신 위). 병기본(`<패키지루트>/docs/code_review/<주제>/README.md`)도 동일하게 갱신:
 
 | 날짜 | 코드 버전 | Verdict | 핵심 |
 | --- | --- | --- | --- |
@@ -265,6 +276,7 @@ Verdict: REQUEST CHANGES
 10. **인벤토리 5 항목 "없음" 명시 의무** — 비어도 "없음" 한 줄(점검 누락과 구분)
 11. **작성자 self-APPROVE 금지** — 별도 lane 에서만 `APPROVE`
 12. **날짜=버전 + 코드 버전 고정** — 요청마다 `<주제>/YYYY-MM-DD.md`, 리뷰 커밋/해시 명시, findings 상태(`[해결]`/`[잔존]`/`[신규]`/`[퇴행]`) 추적
+13. **이중 기록(루트 정본 + 패키지 병기)** — 루트 `docs/code_review/<주제>/` 정본 + `<패키지루트>/docs/code_review/<주제>/` 병기(동일 내용). 패키지 루트 특정 불가 시 루트만
 
 ---
 
@@ -319,4 +331,4 @@ grep "^## " $TARGET | head -1
 
 ---
 
-**VERSION**: 1.1.0 (날짜 기반 리뷰 버전 관리 추가 — 코드 버전 고정·타임라인 인덱스·findings 상태 추적)
+**VERSION**: 1.2.0 (이중 기록 규칙 추가 — 루트 정본 `docs/code_review/<주제>/` + 패키지 병기 `<패키지루트>/docs/code_review/<주제>/`, 동일 내용 동기)
