@@ -18,6 +18,38 @@ import session_record as sr  # noqa: E402
 
 ORPHAN_AGE = 7 * 86400
 
+SESSION_LOG_HEADER = (
+    "# 세션별 요청 로그\n\n"
+    "세션 종료 시 그 세션의 요청 원문을 세션 단위로 묶어 기록(최신 세션 위). "
+    "시간순 원문 전체는 user_instructions.md 병기.\n\n---\n\n"
+)
+
+
+def _prepend_session_log(cwd, short, text):
+    """세션 요청 목록을 session_log.md 에 세션 블록으로 prepend(최신 위). flock 보호."""
+    reqs = sr.parse_requests(text)
+    if not reqs:
+        return
+    block = sr.format_session_block(short, reqs)
+    path = sr.session_log_path(cwd)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    lock = path + ".lock"
+    with open(lock, "w") as lf:
+        fcntl.flock(lf, fcntl.LOCK_EX)
+        try:
+            existing = ""
+            if os.path.isfile(path):
+                with open(path, encoding="utf-8") as f:
+                    existing = f.read()
+            rest = existing[len(SESSION_LOG_HEADER):] \
+                if existing.startswith(SESSION_LOG_HEADER) else existing
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                f.write(SESSION_LOG_HEADER + block + rest)
+            os.replace(tmp, path)
+        finally:
+            fcntl.flock(lf, fcntl.LOCK_UN)
+
 
 def _merge_blocks(cwd, blocks):
     """blocks(엔트리 문자열들)를 기존 로그와 시간 역순 병합 후 rewrite. flock 보호."""
@@ -88,6 +120,10 @@ def main():
     if not to_merge:
         return
     _merge_blocks(cwd, [text for _, text in to_merge])
+    # 세션별 요청 로그 병기 (own 이 맨 위에 오도록 역순으로 prepend)
+    for p, text in reversed(to_merge):
+        short = os.path.basename(p)[:-3][:8]  # "{session_id}.md" → 앞 8자
+        _prepend_session_log(cwd, short, text)
     for p, _ in to_merge:
         try:
             os.remove(p)

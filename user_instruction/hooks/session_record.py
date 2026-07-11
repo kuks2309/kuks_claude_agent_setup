@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 
 KST = timezone(timedelta(hours=9))
 HEADER_RE = re.compile(r"^## (\d{4}-\d{2}-\d{2} \d{2}:\d{2}) \(KST\) · sess:")
+QUOTE_RE = re.compile(r'^>\s*"(.*)"\s*$')
 
 
 def kst_now_str():
@@ -22,6 +23,10 @@ def sessions_dir(cwd):
 
 def log_path(cwd):
     return os.path.join(cwd, "docs", "user_instructions", "user_instructions.md")
+
+
+def session_log_path(cwd):
+    return os.path.join(cwd, "docs", "user_instructions", "session_log.md")
 
 
 def rule_active(cwd):
@@ -58,3 +63,34 @@ def parse_entries(text):
     if cur_ts is not None:
         entries.append((cur_ts, "".join(cur)))
     return entries
+
+
+def parse_requests(text):
+    """(ts_key, 원문) 목록 — 각 엔트리의 헤더 시각과 인용 원문 페어. 문서 순서."""
+    reqs = []
+    for ts, block in parse_entries(text):
+        for ln in block.splitlines():
+            m = QUOTE_RE.match(ln.strip())
+            if m:
+                reqs.append((ts, m.group(1)))
+                break
+    return reqs
+
+
+def format_session_block(short, requests):
+    """requests: [(ts, 원문)] → 세션 블록(시간 오름차순). 같은 날이면 HH:MM, 다중일이면 전체 시각."""
+    ordered = sorted(requests, key=lambda r: r[0])
+    n = len(ordered)
+    dates = {ts[:10] for ts, _ in ordered}
+    single = len(dates) <= 1
+    if not ordered:
+        span = ""
+    elif single:
+        span = ordered[0][0][:10]
+    else:
+        span = f"{ordered[0][0][:10]} ~ {ordered[-1][0][:10]}"
+    lines = [f"## {span} · sess:{short} · 요청 {n}건\n"]
+    for ts, q in ordered:
+        stamp = ts[11:] if single else ts  # HH:MM(같은 날) / 전체(다중일)
+        lines.append(f'- {stamp} — "{q}"')
+    return "\n".join(lines) + "\n\n---\n\n"

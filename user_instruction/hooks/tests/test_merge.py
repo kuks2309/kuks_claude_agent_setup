@@ -83,6 +83,39 @@ def test_merge_gc_orphan_older_than_7d():
         assert "orphan" in log
 
 
+def test_session_log_extracted_on_merge():
+    with tempfile.TemporaryDirectory() as cwd:
+        _activate_rule(cwd)
+        _write_session(cwd, "SID-log", [
+            ("2026-07-05 14:34", "네번째 요청"),
+            ("2026-07-05 14:10", "첫번째 요청"),
+        ])
+        _run_merge(cwd, "SID-log")
+        slog = os.path.join(cwd, "docs", "user_instructions", "session_log.md")
+        assert os.path.isfile(slog), "session_log.md 미생성"
+        content = open(slog, encoding="utf-8").read()
+        assert "sess:SID-log" in content
+        assert "요청 2건" in content
+        assert "첫번째 요청" in content and "네번째 요청" in content
+        # 세션 내부 시간 오름차순: 14:10 이 14:34 보다 위
+        assert content.index("첫번째 요청") < content.index("네번째 요청")
+
+
+def test_session_log_accumulates_newest_session_on_top():
+    with tempfile.TemporaryDirectory() as cwd:
+        _activate_rule(cwd)
+        _write_session(cwd, "SID-old", [("2026-07-05 10:00", "old-req")])
+        _run_merge(cwd, "SID-old")
+        _write_session(cwd, "SID-new", [("2026-07-05 12:00", "new-req")])
+        _run_merge(cwd, "SID-new")
+        content = open(os.path.join(cwd, "docs", "user_instructions",
+                                    "session_log.md"), encoding="utf-8").read()
+        # 최신 세션 블록이 위
+        assert content.index("SID-new") < content.index("SID-old")
+        # 헤더 중복 없음
+        assert content.count("# 세션별 요청 로그") == 1
+
+
 if __name__ == "__main__":
     fails = 0
     for name, fn in sorted(globals().items()):

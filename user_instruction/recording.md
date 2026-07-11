@@ -31,6 +31,7 @@ cd user_instruction && ./install.sh <타깃-프로젝트-루트>
 - **사용자 원문만** 박제 — hook 이 기록하므로 요약·해석 섞임 구조적으로 불가.
 - **다른 세션 파일을 읽거나 `user_instructions.md` 를 현재 작업 소스로 취급하지 않는다**(교차 누수 차단).
 - 세션 종료 시 `user_instruction-merge.py`(SessionEnd hook)가 자기 파일만 `user_instructions.md` 단일 누적 로그로 시간 역순 병합하고 세션 파일을 정리한다.
+- 동시에 그 세션의 요청 목록을 세션 단위로 묶어 `session_log.md` 에 **병기**(세션 블록 1개, 최신 세션 위)한다. `user_instructions.md`(시간순 원문) ↔ `session_log.md`(세션별 그룹) 두 평행 durable 로그.
 
 `docs/user_instructions/sessions/` 는 `.gitignore` 대상(전이적). 커밋 대상은 병합 결과 `docs/user_instructions/user_instructions.md` 뿐이다.
 
