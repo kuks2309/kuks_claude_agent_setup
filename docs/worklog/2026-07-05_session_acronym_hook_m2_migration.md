@@ -15,21 +15,32 @@
 ## 단계별 결과
 
 ### 1단계 — 현황 분석
+
 - 훅 2종 구조 규명: 리마인더(무마찰) + 검증(마찰원). `acronym-check.py` 가 대문자 2~6자 미(未)화이트리스트 토큰을 위반 단정 → 강제 재작성.
 
 ### 2단계 — 설계 (M1/M2/M3)
+
 - M1 답변 내 자기점검 / M2 AI 검토 Stop 훅 / M3 결정론 검사기(현행) 제시. 사용자 **M2 선택**.
 
 ### 3단계 — 라이브 적용 (`~/.claude`)
+
 - 신규 `acronym-review.py` (요청형 메시지, `stop_hook_active` 루프 방지 — 검토 최대 1패스). `settings.json`: UserPromptSubmit 리마인더 제거, Stop → `acronym-review.py`. 옛 훅 파일 삭제. 4-케이스 테스트 통과.
 
 ### 4단계 — 번들 반영 (`kuks_claude_skill_setup/acronym/`)
+
 - `hooks/acronym-review.py` 신규(check.py rename), `hooks/acronym-reminder.sh` 삭제, `install.sh` 마이그레이션(옛 훅 파일·등록 정리 + Stop 검토 훅만 등록), `acronym.md` §4/§5 개정.
 - 커밋 `3e8f7f9`(feat) · `94bd167`(docs) → origin + fito 푸시, SHA(Secure Hash Algorithm) 동기 검증.
 
 ### 5단계 — uninstall.sh 추가
+
 - install 의 역: 훅 등록 · CLAUDE.md 스니펫 · `~/.claude/acronym/` 파일 외과적 제거. 사전 백업, 멱등, `.bak` 복원 안 함(옛 reminder+check 구성 부활 방지). install→uninstall 왕복 · 멱등 테스트 통과.
 - 커밋 `5b10ecd`(feat) → origin + fito 푸시, SHA 동기 검증.
+
+### 6단계 — 훅 백틱-병기 인식 보완
+
+- 훅이 인라인 코드를 먼저 제거한 뒤 병기(introduced)를 수집해, `KST(Korea Standard Time)` 처럼 백틱 안에 단 병기가 누락되고 백틱 밖 bare 토큰이 오탐되던 결함 발견.
+- 수정: introduced 는 인라인 코드를 **남긴** base 에서, 후보 탐지는 백틱을 **제거한** scan 에서 분리 수집. 회귀 검증 — 어디에도 병기 없는 진짜 미병기는 그대로 검출됨.
+- 커밋 `9f07ba7`(fix) → origin + fito 푸시.
 
 ## 산출물 (커밋)
 
@@ -38,12 +49,17 @@
 | `3e8f7f9` | feat(acronym): 검증 훅 → AI 검토 방식 전환 (오탐 재작성 제거) |
 | `94bd167` | docs(acronym): 적용 방식 개정 (CLAUDE.md 규칙 + Stop AI 검토 훅) |
 | `5b10ecd` | feat(acronym): 전역 제거 스크립트 uninstall.sh 추가 |
+| `9f07ba7` | fix(acronym): 백틱으로 감싼 병기를 introduced 로 인식 (오탐 수정) |
 
 - 라이브(`~/.claude`): `acronym-review.py` 훅 작동 중(M2). 세션 중 `SHA` 미병기를 실제로 잡아 교정 지시함(실동작 확인).
 - 번들: `install.sh` ↔ `uninstall.sh` 대칭 쌍 완성. 다른 프로젝트에서 설치→테스트→제거 반복 가능.
 
+## 결과 보강 / 해소
+
+- **`SHA` 화이트리스트 제안 → 기각**: `SHA(Secure Hash Algorithm)` 는 진짜 약자로, 화이트리스트(비-약자·초보편 토큰 전용)에 넣으면 정당한 검토를 억제함. 반복 검출은 훅 오작동이 아니라 병기 습관 문제 → 화이트리스트 변경 없음.
+- **반복 검출의 실제 원인 = 백틱 병기 미인식**: 6단계 수정(`9f07ba7`)으로 해소.
+
 ## 미해결 / 후속
 
-- **`SHA` 화이트리스트 결정 대기**: 세션 중 `SHA` 가 검토 요청에 2회 걸림(git·암호 문맥 흔한 약어). 화이트리스트 추가(되묻기 소음 감소) 여부 사용자 판단 필요.
 - 라이브 훅 변경은 세션 재시작 후 적용.
 - 다른 프로젝트 설치 테스트 결과 피드백 대기(사용자 예고).
