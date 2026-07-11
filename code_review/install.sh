@@ -49,6 +49,14 @@ if [ -f "$SRC/hooks/code-review-reminder.py" ]; then
   echo "✓ 훅 복사: docs/claude_guideline/$BUNDLE/hooks/code-review-reminder.py"
 fi
 
+# 1-c) checks/ 복사 (drawio 정확성 검증기 등)
+if [ -d "$SRC/checks" ]; then
+  mkdir -p "$DEST/checks"
+  cp "$SRC"/checks/* "$DEST/checks/" 2>/dev/null || true
+  chmod +x "$DEST"/checks/*.py 2>/dev/null || true
+  echo "✓ checks 복사: docs/claude_guideline/$BUNDLE/checks/"
+fi
+
 # 2) 도메인 선택 복사
 DOMAINS=()
 if [ "${1:-}" = "--all" ]; then

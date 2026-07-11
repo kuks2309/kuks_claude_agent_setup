@@ -27,6 +27,14 @@ mkdir -p "$DEST"
 cp "$SRC/structure.md" "$DEST/structure.md"
 echo "✓ 코어 복사: docs/claude_guideline/$BUNDLE/structure.md"
 
+# 1-b) checks/ 복사 (drawio 정확성 검증기)
+if [ -d "$SRC/checks" ]; then
+  mkdir -p "$DEST/checks"
+  cp "$SRC"/checks/* "$DEST/checks/" 2>/dev/null || true
+  chmod +x "$DEST"/checks/*.py 2>/dev/null || true
+  echo "✓ checks 복사: docs/claude_guideline/$BUNDLE/checks/"
+fi
+
 # 2) CLAUDE.md 등록 (마커 중복방지)
 CLAUDE_MD="$TARGET/CLAUDE.md"
 MARKER="kuks_agent_setup:$BUNDLE"

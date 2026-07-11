@@ -32,7 +32,7 @@ DIRECTIVE = """[CODE REVIEW SOP — 강제 게이트]
 1. {review_md} 를 Read 한다 (생략 금지 — 등록 사실만 알고 건너뛰지 말 것).
 2. 설치된 도메인이 있으면 docs/claude_guideline/code_review/domains/ 를 함께 적용한다.
 3. review.md 의 9단계 SOP 를 순서대로 따른다:
-   범위 식별 → 단위/전체 분기 → 도메인 감지 → 코어 인벤토리 5항목(목적·플로우·함수표·전역표·의존성) → 도메인 인벤토리 → severity 평가(Critical/High/Medium/Low/Info) → docs/code_review/<주제>/YYYY-MM-DD.md 기록 → 자체점검 grep → 1~2줄 결과 보고.
+   범위 식별 → 단위/전체 분기 → 도메인 감지 → 코어 인벤토리 5항목(목적·플로우·함수표·전역표·의존성) → 도메인 인벤토리 → severity 평가(Critical/High/Medium/Low/Info) → docs/code_review/<주제>/YYYY-MM-DD.md(루트 정본+패키지 병기) + 플로우차트 .drawio(박스·화살표 검증) 기록 → 자체점검 grep → 1~2줄 결과 보고.
 4. 인벤토리·severity 평가·산출물 기록을 생략한 '일반 리뷰'로 대체하지 않는다.""".format(
     review_md=REVIEW_MD
 )

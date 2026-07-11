@@ -14,7 +14,7 @@ cd code_review && ./install.sh <타깃-프로젝트-루트> [도메인...]
 
 스크립트가 코어(`review.md`)를 `docs/claude_guideline/code_review/` 로, 선택한 도메인(`domains/<도메인>.md`)을 `.../code_review/domains/` 로 복사하고, 등록 스니펫을 타깃 `CLAUDE.md` 에 append 한다 (덮어쓰기 아님).
 
-- **리뷰 산출물**: `docs/code_review/<주제>/YYYY-MM-DD.md` (날짜=버전) — 폴더·파일 없으면 만든다(승인 불요). 주제 폴더에 타임라인 인덱스 `README.md` 동반. **루트 정본 + 패키지 병기 이중 기록**(→ [기록 위치](#기록-위치--버전-관리-날짜-기반) 의 병기 규칙).
+- **리뷰 산출물**: `docs/code_review/<주제>/YYYY-MM-DD.md` (날짜=버전) — 폴더·파일 없으면 만든다(승인 불요). 주제 폴더에 타임라인 인덱스 `README.md` 동반. **루트 정본 + 패키지 병기 이중 기록**(→ [기록 위치](#기록-위치--버전-관리-날짜-기반) 의 병기 규칙). **플로우차트는 `.drawio` 도 동반**(→ §코드 플로우차트).
 - **활성화 게이트**: 본 파일이 `docs/claude_guideline/code_review/review.md` 경로에 없으면 본 SOP 는 비활성.
 
 ## 트리거
@@ -43,7 +43,7 @@ cd code_review && ./install.sh <타깃-프로젝트-루트> [도메인...]
    ↓
 [Step 6] 평가 (severity 클러스터)    ──→  ✓ Critical/High/Medium/Low/Info + 카테고리 태그
    ↓
-[Step 7] docs/code_review/<주제>/YYYY-MM-DD.md 기록 ──→  ✓ 코드 버전 고정 + 인덱스 갱신
+[Step 7] docs/code_review/<주제>/YYYY-MM-DD.md 기록 ──→  ✓ 코드 버전 고정 + drawio + 이중기록 인덱스
    ↓
 [Step 8] 자체 점검 grep              ──→  ✓ 헤더·#번호·카테고리 태그 통과
    ↓
@@ -79,6 +79,12 @@ cd code_review && ./install.sh <타깃-프로젝트-루트> [도메인...]
 | 전체 구조 분석 (디렉토리·다중 모듈) | **전체 코드 흐름도** — 모듈 간 호출 관계, 데이터 흐름, 진입점·종료점, 외부 인터페이스 |
 
 **다중 진입점 분리 룰**: 한 패키지에 2개 이상 진입점(offline/live, CLI/라이브러리)이 있으면 path 별로 흐름도 분리 + 공통 호출 그래프 별도 표시.
+
+**drawio 동반 (의무)** — 플로우차트는 mermaid 본문 외에 **`.drawio`(diagrams.net XML) 파일도 생성**한다:
+
+- 위치: 날짜 파일과 같은 폴더(루트 정본·패키지 병기 **양쪽**)의 `YYYY-MM-DD-flow.drawio` (흐름도 여럿이면 `-flow-<이름>.drawio`).
+- 형식 `mxGraphModel`: **박스** = `<mxCell vertex="1">` + `<mxGeometry x y width height>`, **화살표** = `<mxCell edge="1" source="<박스id>" target="<박스id>">` + `endArrow=classic`.
+- **정확성 검증 의무 (반드시 생성 후 확인·수정)**: ① XML well-formed ② 모든 화살표 `source`/`target` 가 실재 박스 id (dangling 0) ③ mermaid 흐름도의 노드·엣지가 drawio 에 1:1 존재. 검증기 `checks/drawio_validate.py`.
 
 ### 3. 함수 리스트 표
 
@@ -182,7 +188,7 @@ Verdict: REQUEST CHANGES
 - **Step 4 Core 인벤토리** — 5 항목 작성, 누락 0.
 - **Step 5 도메인 인벤토리** — 감지된 도메인의 추가 표 작성. 빈 표는 "해당 항목 없음" 명시.
 - **Step 6 평가** — severity 클러스터 + 카테고리 태그. 모든 항목 인벤토리 `#` 인용.
-- **Step 7 기록** — `docs/code_review/<주제>/YYYY-MM-DD.md`(날짜=버전). 코드 버전 고정 + 타임라인 인덱스(`README.md`) 갱신.
+- **Step 7 기록** — `docs/code_review/<주제>/YYYY-MM-DD.md`(날짜=버전, 루트 정본 + 패키지 병기). 코드 버전 고정 + 플로우차트 `.drawio` 생성·검증 + 타임라인 인덱스 갱신.
 - **Step 8 자체 점검** — 아래 grep 통과.
 - **Step 9 보고** — 1~2 줄. 변경 파일/후속 TODO 명시.
 
@@ -241,7 +247,7 @@ Verdict: REQUEST CHANGES
 
 ### Core 인벤토리
 #### 1. 목적
-#### 2. 코드 플로우차트
+#### 2. 코드 플로우차트  (mermaid + `YYYY-MM-DD-flow.drawio` 동반·검증)
 #### 3. 함수 리스트
 #### 4. 전역 변수 / 모듈 상수  (없으면 "없음")
 #### 5. 의존성 3-tier
@@ -277,6 +283,7 @@ Verdict: REQUEST CHANGES
 11. **작성자 self-APPROVE 금지** — 별도 lane 에서만 `APPROVE`
 12. **날짜=버전 + 코드 버전 고정** — 요청마다 `<주제>/YYYY-MM-DD.md`, 리뷰 커밋/해시 명시, findings 상태(`[해결]`/`[잔존]`/`[신규]`/`[퇴행]`) 추적
 13. **이중 기록(루트 정본 + 패키지 병기)** — 루트 `docs/code_review/<주제>/` 정본 + `<패키지루트>/docs/code_review/<주제>/` 병기(동일 내용). 패키지 루트 특정 불가 시 루트만
+14. **플로우차트 drawio 동반 + 검증** — mermaid 외 `.drawio` 생성(양쪽 사본), 박스·화살표(source/target) 정확성 검증(dangling 0, mermaid ↔ drawio 노드·엣지 1:1). 검증기 `checks/drawio_validate.py`
 
 ---
 
@@ -310,6 +317,11 @@ grep -E "감지된 도메인: " $TARGET
 # 7. user_instructions.md 시각 매핑 (user_instruction 번들 설치 시에만 — 없으면 생략, 무해)
 grep "^## " $TARGET | head -1
 [ -f docs/user_instructions/user_instructions.md ] && grep "^## " docs/user_instructions/user_instructions.md | head -1 || echo "(user_instructions.md 없음 — 매핑 생략)"
+
+# 8. 플로우차트 drawio 정확성 (생성 시) — 박스·화살표 source/target 검증
+for d in "$(dirname "$TARGET")"/*flow*.drawio; do
+  [ -f "$d" ] && python3 docs/claude_guideline/code_review/checks/drawio_validate.py "$d"
+done
 ```
 
 설치된 도메인 sub-file 의 자체 점검 grep 도 함께 통과해야 한다.
@@ -331,4 +343,4 @@ grep "^## " $TARGET | head -1
 
 ---
 
-**VERSION**: 1.2.0 (이중 기록 규칙 추가 — 루트 정본 `docs/code_review/<주제>/` + 패키지 병기 `<패키지루트>/docs/code_review/<주제>/`, 동일 내용 동기)
+**VERSION**: 1.3.0 (이중 기록 유지 + 플로우차트 drawio 동반·검증 추가 — checks/drawio_validate.py, 박스·화살표 dangling 0)
