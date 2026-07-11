@@ -14,7 +14,7 @@ cd sw_structure && ./install.sh <타깃-프로젝트-루트>
 
 스크립트가 코어(`structure.md`)를 `docs/claude_guideline/sw_structure/` 로 복사하고, 등록 스니펫을 타깃 `CLAUDE.md` 에 append 한다 (덮어쓰기 아님).
 
-- **분석 산출물**: `docs/sw_structure/<주제>/YYYY-MM-DD.md` (날짜=버전) — 폴더·파일 없으면 만든다(승인 불요). 주제 폴더에 타임라인 인덱스 `README.md` 동반.
+- **분석 산출물**: `docs/sw_structure/<주제>/YYYY-MM-DD.md` (날짜=버전) — 폴더·파일 없으면 만든다(승인 불요). 주제 폴더에 타임라인 인덱스 `README.md` 동반. **루트 정본 + 패키지 병기 이중 기록**(→ §기록 위치). **①②③ 다이어그램은 `.drawio` 도 동반**.
 - **활성화 게이트**: 본 파일이 `docs/claude_guideline/sw_structure/structure.md` 경로에 없으면 본 SOP 는 비활성.
 
 ## 트리거
@@ -58,7 +58,7 @@ cd sw_structure && ./install.sh <타깃-프로젝트-루트>
    ↓
 [Step 8] 구조 관찰 (사실만)       ────→  ✓ 순환·고립·진입점 수, 판정 없음
    ↓
-[Step 9] docs/sw_structure/<주제>/YYYY-MM-DD.md 기록 ────→  ✓ KST 시각, 타임라인 인덱스
+[Step 9] docs/sw_structure/<주제>/YYYY-MM-DD.md 기록 ────→  ✓ KST 시각, ①②③ drawio + 이중기록 인덱스
    ↓
 [Step 10] 자체 점검 grep          ────→  ✓ 그래프 블록·관계표 헤더·관계 종류 통과
    ↓
@@ -86,6 +86,8 @@ flowchart LR
 - 노드 라벨은 **파일명** (동명 파일 충돌 시 상대경로로 구분)
 - 외부 라이브러리 의존은 그래프에 포함하지 않음 (내부 파일 연결만). 단 진입점 식별에 필요하면 외부를 점선 `-.->` 로 별도 표기.
 - 그래프가 30 노드를 넘으면 디렉토리/서브패키지 단위로 그룹(`subgraph`) 분할.
+
+**drawio 동반 (의무) — ①②③ 모든 다이어그램** — 파일 의존 그래프·클래스 관계도·시퀀스 다이어그램은 각각 mermaid 외 **`.drawio`(diagrams.net XML) 파일도 생성**한다: 파일명 `YYYY-MM-DD-file-graph.drawio`(①)·`-class.drawio`(②)·`-sequence.drawio`(③), 루트 정본·패키지 병기 **양쪽**. 형식 `mxGraphModel`(노드=`vertex="1"`+`mxGeometry`, 엣지=`edge="1" source/target=노드id`). **생성 후 검증 의무**: XML well-formed · 엣지 source/target dangling 0 · mermaid ↔ drawio 노드·엣지 1:1 — 검증기 `checks/drawio_validate.py`.
 
 ### ② 클래스 관계도
 
@@ -170,10 +172,12 @@ sequenceDiagram
 
 ## 기록 위치 / 템플릿
 
+**이중 기록 (루트 정본 + 패키지 병기, 의무)** — 산출물은 두 곳에 동일 내용으로 병기: **루트 정본** `docs/sw_structure/<주제>/YYYY-MM-DD.md` + **패키지 병기** `<패키지루트>/docs/sw_structure/<주제>/YYYY-MM-DD.md`. `<패키지루트>` = 대상이 속한 패키지/툴 루트(ROS2 `package.xml`, 그 외 최상위 도구/모듈 디렉토리). 패키지 루트 특정 불가 시 루트 정본만.
+
 기록 위치: `docs/sw_structure/<주제>/YYYY-MM-DD.md` (날짜=버전)
 
 - `<주제>` = 대상 파일명 / 모듈명 / 패키지명 / 디렉토리명
-- 동일 주제 재분석 → 같은 `<주제>/` 폴더에 새 `YYYY-MM-DD.md`, 주제 폴더 `README.md` 타임라인 인덱스 갱신 (없으면 생성)
+- 동일 주제 재분석 → 같은 `<주제>/` 폴더에 새 `YYYY-MM-DD.md`, 주제 폴더 `README.md` 타임라인 인덱스 갱신 (없으면 생성). 병기본도 동일 갱신
 - `user_instruction` 번들이 함께 설치된 경우에만 같은 시각 지시 기록과 제목 매핑 (없으면 생략)
 
 기록 템플릿:
@@ -235,6 +239,8 @@ sequenceDiagram
 6. **추측 금지** — import·상속·호출은 grep / LSP / AST 실측 인용. 추정 금지
 7. **외부 의존 제외 (상속 예외)** — 외부 라이브러리는 ① 파일 의존 그래프에서 제외. **단 외부 기반 클래스 상속(inherit)은 ② 에 `<<external>>` leaf 로 표기** — 타입 정체성은 핵심 연결
 8. **대형 그래프 분할** — 30 노드 초과 시 `subgraph` 로 디렉토리/패키지 그룹 분할
+9. **이중 기록(루트 정본 + 패키지 병기)** — 루트 `docs/sw_structure/<주제>/` 정본 + `<패키지루트>/docs/sw_structure/<주제>/` 병기(동일 내용). 패키지 루트 특정 불가 시 루트만
+10. **①②③ 모든 다이어그램 drawio 동반 + 검증** — 파일그래프·클래스·시퀀스 각각 mermaid 외 `.drawio` 생성, 노드·엣지(source/target) 검증(dangling 0, mermaid ↔ drawio 1:1). 검증기 `checks/drawio_validate.py`
 
 ---
 
