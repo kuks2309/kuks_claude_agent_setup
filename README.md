@@ -2,7 +2,7 @@
 
 Claude Code 자산(규칙·훅) 설치 저장소. 각 자산은 **폴더별 자기완결 번들**이며, 폴더 안의 `install.sh` 로 **따로** 설치한다 (루트 중앙 스크립트 없음).
 
-**git 협업 모드: solo** — origin(kuks2309 개인) `main` 직접 commit/push, PR 미사용. `fito`(FitoControl) 는 관리자 단방향 미러 → `git push origin main && git push fito main` 으로 동기화([git_workflow](git_workflow/git_workflow.md) §0 미러 예외). 공동 작업 전환 시 본 줄을 `team` 으로 갱신한다.
+**git 협업 모드: solo** — origin(kuks2309 개인) `main` 직접 commit/push, PR 미사용. 다른 사람은 코워커(collaborator)로 등록되어 있어도 **참조(열람) 전용** — commit·PR 기여를 받지 않는다. `fito`(FitoControl) 는 관리자 단방향 미러 → `git push origin main && git push fito main` 으로 동기화([git_workflow](git_workflow/git_workflow.md) §0 미러 예외). 공동 작업 전환 시 본 줄을 `team` 으로 갱신한다.
 
 ## 자산 목록
 
