@@ -71,18 +71,20 @@ def last_assistant_text(transcript_path):
 
 
 def find_candidates(text):
-    # 코드블록 / 인라인 코드 / URL 제거 (예외 영역)
-    text = re.sub(r"```.*?```", " ", text, flags=re.S)
-    text = re.sub(r"`[^`]*`", " ", text)
-    text = re.sub(r"https?://\S+", " ", text)
-    # 본문 어디든 확장형(약자 바로 뒤 '(')이 한 번이라도 있으면 '도입된 약자'로 간주.
-    # 규칙은 "첫 등장 시 병기" — 이후 bare 사용은 위반 아님.
-    introduced = set(re.findall(r"\b([A-Z]{2,6})\(", text))
+    # 코드블록·URL 제거 (예외 영역). 인라인 코드(백틱)는 두 용도로 다르게 다룬다.
+    base = re.sub(r"```.*?```", " ", text, flags=re.S)
+    base = re.sub(r"https?://\S+", " ", base)
+    # (1) 병기 인식(introduced): 약자 바로 뒤 '(' 가 한 번이라도 있으면 '도입된 약자'로 간주.
+    #     백틱으로 감싼 병기(`KST(Korea Standard Time)`)도 인정하려고 인라인 코드를 '남긴'
+    #     base 에서 수집한다. 규칙은 "첫 등장 시 병기" — 이후 bare 사용은 위반 아님.
+    introduced = set(re.findall(r"\b([A-Z]{2,6})\(", base))
+    # (2) 후보 탐지(candidate): 인라인 코드 안의 토큰은 후보가 아니므로 백틱을 '제거한' 본문에서 스캔.
+    scan = re.sub(r"`[^`]*`", " ", base)
     out = []
     seen = set()
     # 약자는 보통 2~6자. 문자+숫자 식별자(MD060·STM32)와 7자+ 대문자 단어
     # (CODEOWNERS·UNVERIFIED 등)는 약자 아님 — 제외.
-    for m in re.finditer(r"\b([A-Z]{2,6})\b(?![0-9])", text):
+    for m in re.finditer(r"\b([A-Z]{2,6})\b(?![0-9])", scan):
         tok = m.group(1)
         if tok in WHITELIST or tok in introduced or tok in seen:
             continue
