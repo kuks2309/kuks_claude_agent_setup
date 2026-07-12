@@ -39,14 +39,21 @@ arguments:
 ```bash
 # 대상 창을 앞으로 올리며 캡처 (권장)
 python3 ~/.claude/capture_screen.py --mode list                      # 창 id 확인
-python3 ~/.claude/capture_screen.py --mode window --window-id 0x... --label "cu_step"
+python3 ~/.claude/capture_screen.py --mode window --window-id <id> --label "cu_step"
 # 또는 전체 화면 (대상 창이 이미 최상위·포커스임이 확실할 때)
 python3 ~/.claude/capture_screen.py --mode full --label "cu_step"
 ```
 
-좌표는 화면 절대 좌표(전체화면 1:1; 창 모드는 창 offset 을 더함). 포커스를
-명시적으로 주려면 `xdotool windowactivate <id>`. 조작 후 Step 5 재캡처의 화면
-변화로 대상 창이 맞았는지 반드시 재확인한다.
+- **창 id**: Linux(X11)=16진 `0x2800008`, Windows=hwnd 10진(또는 `0x`16진). 둘 다 `--mode list` 출력의 `id` 값을 그대로 넣는다. `--mode window` 는 두 플랫폼 모두 캡처 전 대상 창을 자동으로 앞으로 올린다(Windows 는 추가 `xdotool` 불필요; Linux 는 명시 포커스 시 `xdotool windowactivate <id>`).
+- **다중 모니터**: `--mode monitors` 로 각 모니터의 offset·크기와 가상 데스크톱 범위를 먼저 확인한다. 특정 모니터 전체는 `--mode full --monitor N`(N 은 monitors 출력의 `monitor_arg`).
+- **Windows 실행**: 예시의 `python3` 대신 `python` 을 사용한다(`python3` 는 Store 앨리어스로 잡혀 실패할 수 있음).
+
+좌표는 가상 데스크톱 전체의 절대 물리 픽셀이다(전체화면 1:1; 창 모드는 창
+offset 을 더함). 다중 모니터에서 2번째 모니터는 첫 모니터 폭만큼 x 가 이어진다
+(예: `--mode monitors` 가 `left:2560` 이면 그 모니터 좌표는 2560~). Windows 는
+스크립트가 per-monitor DPI 인식을 설정하므로 배율≠100% 에서도 좌표가 캡처
+픽셀과 일치한다. 조작 후 Step 5 재캡처의 화면 변화로 대상 창이 맞았는지 반드시
+재확인한다.
 
 ### Step 3: 분석 + 다음 action 결정
 Read 도구로 캡처 이미지를 읽고 목표 대비 현재 화면을 분석한다. 다음 한
@@ -82,12 +89,16 @@ Step 2 와 동일하게 재캡처하고 Read 로 비교한다. "실행한 동작
 - 최대 스텝(기본 20) 초과
 
 ## 좌표 가이드
-캡처 이미지에서 대상의 픽셀 위치를 그대로 좌표로 쓴다(전체화면 1:1). 클릭이
-빗나가면 재캡처에서 미변화를 감지해 좌표를 재추론한 뒤 보정한다.
+캡처 이미지에서 대상의 픽셀 위치를 그대로 좌표로 쓴다(전체화면 1:1). 다중
+모니터에서는 `--mode monitors` 의 각 모니터 offset 을 좌표에 반영한다(2번째
+모니터는 x 가 첫 모니터 폭 이상). 클릭이 빗나가면 재캡처에서 미변화를 감지해
+좌표를 재추론한 뒤 보정한다.
 
 ## 환경 요구
 - Linux(X11): `xdotool`, `x11-utils` 필요. Wayland 미지원.
-- Windows: `pyautogui` 필요.
+- Windows: `pyautogui` 필요(`pygetwindow`·`pillow`·`mss` 는 pyautogui 의존성으로
+  함께 설치됨). `--mode list`/`window`/`monitors`, 클릭·타이핑·키 입력, 다중
+  모니터·DPI 배율 모두 지원(실기 검증 완료). 명령은 `python` 으로 실행.
 - 설치: 번들의 `install.sh`(Linux/macOS) 또는 `install.ps1`(Windows). 전역
   `~/.claude` 설치이므로 어느 프로젝트에서든 사용 가능.
 - **사용 전 install.sh 선행 필요** — 스킬은 `~/.claude/computer_action.py`·

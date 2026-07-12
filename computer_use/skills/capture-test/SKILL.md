@@ -18,13 +18,15 @@ arguments:
 사용자가 `/capture-test`를 호출하면 다음 단계를 수행하세요.
 
 ### Step 1: 실행 중인 창 조사
-현재 X11 세션의 최상위 창 목록을 조회합니다.
+최상위 창 목록을 조회합니다. Linux(X11)·Windows 모두 지원합니다(Windows 는
+`python` 으로 실행).
 
 ```bash
-python3 ~/.claude/capture_screen.py --mode list
+python3 ~/.claude/capture_screen.py --mode list        # Windows: python ...
 ```
 
-결과는 JSON 배열(`{id,title,x,y,w,h}`)입니다. 이를 보기 좋은 표로 사용자에게 제시하세요:
+결과는 JSON 배열(`{id,title,x,y,w,h}`)입니다. `id` 는 Linux(X11)=16진 `0x...`,
+Windows=hwnd 10진입니다. 이를 보기 좋은 표로 사용자에게 제시하세요:
 
 ```
 #   ID          크기         제목
@@ -33,6 +35,9 @@ python3 ~/.claude/capture_screen.py --mode list
 3   0x4600019   1280x800    VS Code — capture_screen.py
 ...
 ```
+
+다중 모니터 구성은 `--mode monitors` 로 각 모니터의 offset·크기와 가상 데스크톱
+범위를 확인할 수 있습니다(특정 모니터 전체 캡처는 `--mode full --monitor N`).
 
 ### Step 2: 대상 선택
 사용자에게 대상을 물어보세요. 다음 응답을 모두 허용합니다:
@@ -54,7 +59,9 @@ python3 ~/.claude/capture_screen.py --mode list
 2. 실패하면 현재 작업 디렉터리(CWD)
 3. 쓰기 권한이 없으면 `~` 아래 `~/experiments/capture/`로 폴백
 
-**창 ID 지정** (Step 2에서 번호/제목으로 선택한 경우)
+**창 ID 지정** (Step 2에서 번호/제목으로 선택한 경우) — `--window-id` 는 Linux
+16진 `0x2800008` / Windows hwnd 10진 모두 허용. `window` 모드는 캡처 전 대상
+창을 자동으로 앞으로 올립니다(다중 모니터·보조 화면 창도 정확히 캡처).
 ```bash
 python3 ~/.claude/capture_screen.py \
   --project "{프로젝트 루트}" \
@@ -126,5 +133,8 @@ Read 도구로 캡처된 이미지(들)를 읽고 다음을 분석합니다:
   sudo apt-get install -y xdotool x11-utils
   ```
   `xdotool`은 캡처 전 대상 창을 앞으로 올리는 데 필요합니다 (가려진 창 캡처 문제 방지). `xprop`가 있으면 활성 창 감지 폴백 가능. 캡처는 `Pillow(PIL)`가 있으면 추가 설치 없이 동작하며, `mss`가 설치돼 있으면 그 경로도 사용됩니다.
-- **Windows**: 기존 `mss` + ctypes 경로 유지.
+- **Windows**: `pyautogui`(및 함께 설치되는 `pygetwindow`·`pillow`·`mss`) 필요.
+  `--mode list`(창 열거)·`window`(hwnd 지정 캡처, 자동 활성화)·`active`·`full`·
+  `region`·`monitors` 모두 지원. 스크립트가 per-monitor DPI 인식을 설정하므로
+  다중 모니터·배율≠100% 에서도 캡처 좌표가 정확. 명령은 `python` 으로 실행.
 - **Wayland**: 미지원 (xwininfo 의존).
