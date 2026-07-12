@@ -6,8 +6,9 @@
 # 동작:
 #   1) git_workflow.md + hooks/*.py 를 <타깃>/docs/claude_guideline/git_workflow/ 로 복사
 #   2) claude.snippet.md 를 <타깃>/CLAUDE.md 에 append (마커 중복방지)
-#   3) 훅 3종을 .claude/settings.json 에 멱등 등록:
-#      reminder(UserPromptSubmit) + track(PostToolUse) + stage-gate(PreToolUse·Bash)
+#   3) 훅 5종을 .claude/settings.json 에 멱등 등록:
+#      reminder(UserPromptSubmit) + track(PostToolUse·파일) + commit-track(PostToolUse·Bash)
+#      + stage-gate(PreToolUse·Bash) + push-gate(PreToolUse·Bash)
 #   설치 산출물은 규칙·훅뿐 — install.sh·claude.snippet.md 는 복사하지 않는다.
 
 set -euo pipefail
@@ -59,9 +60,12 @@ if ls "$SRC/hooks/"*.py >/dev/null 2>&1; then
     REMINDER_CMD="$PYBIN \"$HOOK_BASE/$BUNDLE-reminder.py\""
     TRACK_CMD="$PYBIN \"$HOOK_BASE/$BUNDLE-track.py\""
     GATE_CMD="$PYBIN \"$HOOK_BASE/$BUNDLE-stage-gate.py\""
-    "$PYBIN" - "$SETTINGS" "$REMINDER_CMD" "$TRACK_CMD" "$GATE_CMD" <<'PYEOF'
+    CTRACK_CMD="$PYBIN \"$HOOK_BASE/$BUNDLE-commit-track.py\""
+    PUSHGATE_CMD="$PYBIN \"$HOOK_BASE/$BUNDLE-push-gate.py\""
+    "$PYBIN" - "$SETTINGS" "$REMINDER_CMD" "$TRACK_CMD" "$GATE_CMD" "$CTRACK_CMD" "$PUSHGATE_CMD" <<'PYEOF'
 import json, sys
-settings_path, reminder_cmd, track_cmd, gate_cmd = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+settings_path = sys.argv[1]
+reminder_cmd, track_cmd, gate_cmd, ctrack_cmd, pushgate_cmd = sys.argv[2:7]
 try:
     with open(settings_path, encoding="utf-8") as f:
         cfg = json.load(f)
@@ -82,7 +86,9 @@ def register(event, cmd, matcher=None):
 
 register("UserPromptSubmit", reminder_cmd)
 register("PostToolUse", track_cmd, matcher="Write|Edit|MultiEdit|NotebookEdit")
+register("PostToolUse", ctrack_cmd, matcher="Bash")
 register("PreToolUse", gate_cmd, matcher="Bash")
+register("PreToolUse", pushgate_cmd, matcher="Bash")
 
 with open(settings_path, "w", encoding="utf-8") as f:
     json.dump(cfg, f, ensure_ascii=False, indent=2)
