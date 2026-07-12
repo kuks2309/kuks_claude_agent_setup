@@ -6,6 +6,11 @@ can reuse this executor. Backends: Linux X11 -> xdotool ; Windows -> pyautogui.
 Wayland is unsupported. Use --dry-run to print the planned action as JSON without
 executing it.
 
+Coordinates are absolute physical pixels spanning the whole virtual desktop, so
+secondary monitors are addressable (use `capture_screen.py --mode monitors` to see
+each monitor's offset). On Windows the process is made per-monitor DPI aware so
+these coordinates match the capture tool on displays scaled != 100%.
+
 Actions: move click double_click right_click middle_click triple_click
          drag type key scroll wait
 """
@@ -19,6 +24,31 @@ import time
 
 class ActionError(Exception):
     pass
+
+
+def _set_dpi_awareness():
+    """Make the process per-monitor DPI aware on Windows.
+
+    pyautogui is not DPI-aware by default: on displays scaled != 100% it operates
+    in virtualized *logical* coordinates, so a click at (x, y) lands at the wrong
+    physical pixel and mismatches the capture tool (which reports physical pixels).
+    Setting per-monitor awareness makes pyautogui coordinates == physical pixels,
+    which is also required for correct clicks on secondary monitors with a different
+    scale factor. No-op on non-Windows. Must run before pyautogui is imported/used.
+    """
+    if not sys.platform.startswith("win"):
+        return
+    import ctypes
+    for attempt in (
+        lambda: ctypes.windll.user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4)),  # PER_MONITOR_AWARE_V2
+        lambda: ctypes.windll.shcore.SetProcessDpiAwareness(2),                            # PER_MONITOR_AWARE
+        lambda: ctypes.windll.user32.SetProcessDPIAware(),                                 # system-DPI (legacy)
+    ):
+        try:
+            attempt()
+            return
+        except Exception:
+            continue
 
 
 def detect_backend(platform=None, env=None):
@@ -165,6 +195,7 @@ def execute(plan):
     """Perform the plan's ops. Windows ops call pyautogui; Linux ops run xdotool."""
     pyautogui = None
     if plan["backend"] == "windows":
+        _set_dpi_awareness()  # before importing pyautogui so it reads physical-pixel coords
         import pyautogui as _pg
         pyautogui = _pg
     for op in plan["ops"]:
