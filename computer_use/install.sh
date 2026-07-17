@@ -49,6 +49,7 @@ preflight() {
       echo "  ✗ DISPLAY 미설정 — X11 세션 필요. 중단." >&2; return 1
     fi
     command -v xdotool >/dev/null 2>&1 && echo "  xdotool ✓" || echo "  · xdotool 없음 → 의존성 설치 단계에서 설치"
+    command -v wmctrl  >/dev/null 2>&1 && echo "  wmctrl ✓"  || echo "  · wmctrl 없음 → 의존성 설치 단계에서 설치"
     echo "  X11 session ✓"
   fi
   command -v python3 >/dev/null 2>&1 && echo "  python3 ✓" || { echo "  ✗ python3 없음" >&2; return 1; }
@@ -58,7 +59,7 @@ install_deps() {
   [ "$NO_DEPS" = "1" ] && { echo "[DEPS] 생략(--no-deps)"; return 0; }
   echo "[DEPS]"
   if [ "$(uname)" = "Linux" ]; then
-    sudo apt-get install -y xdotool x11-utils
+    sudo apt-get install -y xdotool x11-utils wmctrl
     python3 -m pip install --user pillow mss
   else
     python3 -m pip install --user pyautogui pillow mss
