@@ -95,9 +95,16 @@ Step 2 와 동일하게 재캡처하고 Read 로 비교한다. "실행한 동작
 좌표를 재추론한 뒤 보정한다.
 
 ## 환경 요구
-- Linux(X11): `xdotool`, `x11-utils` 필요. Wayland 미지원.
+- Linux(X11): `xdotool`, `x11-utils`, `wmctrl` 필요. Wayland 미지원. 미설치 시:
+  ```bash
+  sudo apt-get install -y xdotool x11-utils wmctrl
+  ```
+  - `xdotool`: 마우스·키 입력, 창 id 기반 활성화(`xdotool search --name Chrome windowactivate`)
+  - `wmctrl`: 제목 기반 창 전환 한 줄(`wmctrl -a "Machines"`)
 - Windows: `pyautogui` 필요(`pygetwindow`·`pillow`·`mss` 는 pyautogui 의존성으로
-  함께 설치됨). `--mode list`/`window`/`monitors`, 클릭·타이핑·키 입력, 다중
+  함께 설치됨). 미설치 시: `python -m pip install --user pyautogui pillow mss`.
+  창 활성화는 pygetwindow + Win32 `SetForegroundWindow` 가 담당하므로 wmctrl 같은
+  별도 외부 도구 불필요. `--mode list`/`window`/`monitors`, 클릭·타이핑·키 입력, 다중
   모니터·DPI 배율 모두 지원(실기 검증 완료). 명령은 `python` 으로 실행.
 - 설치: 번들의 `install.sh`(Linux/macOS) 또는 `install.ps1`(Windows). 전역
   `~/.claude` 설치이므로 어느 프로젝트에서든 사용 가능.
