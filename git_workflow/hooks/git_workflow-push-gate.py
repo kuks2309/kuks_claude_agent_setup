@@ -9,7 +9,8 @@
 override: 명령에 `gw:allow-main-push` 주석 또는 env GW_ALLOW_MAIN_PUSH=1.
 self-contained. 계약: stdin JSON → 차단 시 permissionDecision=deny(JSON, exit 0), 통과 시 무출력 exit 0.
 한계(정직): 셸 파싱 휴리스틱(eval·alias·xargs 우회 가능); 원격추적 ref 미존재(첫 push)면
-          판정 불가 → 통과; 로컬 ref 기준이라 stale 하면 false-deny 가능(그 경우 fetch+rebase 가 정답).
+          범위 판정 불가 → 단일 세션이면 통과, 타 세션 활동 시엔 override 요구(보수적 deny);
+          로컬 ref 기준이라 stale 하면 false-deny 가능(그 경우 fetch+rebase 가 정답).
 """
 import json
 import os
@@ -83,6 +84,26 @@ def _session_commits(gd, sid):
         return set()
 
 
+def _other_sessions_active(gd, sid):
+    """이 세션 외 다른 세션이 이 워킹트리에서 파일을 수정했으면 True (§2-1 적용조건)."""
+    root = os.path.join(gd, "git_workflow", "sessions")
+    try:
+        entries = os.listdir(root)
+    except OSError:
+        return False
+    for other in entries:
+        if other == sid:
+            continue
+        p = os.path.join(root, other, "touched")
+        try:
+            with open(p, encoding="utf-8") as f:
+                if any(ln.strip() for ln in f):
+                    return True
+        except OSError:
+            continue
+    return False
+
+
 def main():
     raw = sys.stdin.read()
     try:
@@ -124,7 +145,20 @@ def main():
             continue  # 비-보호 브랜치(session/…) → 통과
         track = "refs/remotes/%s/%s" % (remote, branch) if remote else None
         if not track or _git(cwd, "rev-parse", "--verify", "-q", track) is None:
-            continue  # 원격추적 ref 없음(첫 push) → 판정 불가, 통과
+            # 원격추적 ref 없음(첫 push·원격 미설정) → 범위 판정 불가.
+            # 단일 세션이면 무해하나, 공유 워킹트리를 다른 세션도 쓰는 중이면
+            # 첫 push 가 타 세션 커밋까지 통째로 밀 수 있으므로 명시 override 를 요구한다.
+            if _other_sessions_active(gd, sid):
+                deny(
+                    "원격추적 ref 가 없어(첫 push·원격 미설정) push 범위를 판정할 수 없는데, "
+                    "공유 워킹트리를 다른 세션도 수정 중입니다 — `%s` 최초 push 에 타 세션 커밋이 "
+                    "통째로 섞일 수 있습니다.\n"
+                    "→ 이 세션 산출물만 올리려면 git_workflow §2-1 세션 브랜치를 push 하세요: "
+                    "`git push -u origin session/%s` (main 반영은 사용자 소관).\n"
+                    "의도적 최초 통합 push 면 명령에 `# gw:allow-main-push` 를 붙이세요."
+                    % (branch, sid[:8])
+                )
+            continue
         rng = _git(cwd, "rev-list", "%s..HEAD" % track)
         commits = [c for c in (rng or "").split() if c]
         foreign = [c for c in commits if c not in owned]
