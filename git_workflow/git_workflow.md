@@ -39,8 +39,15 @@ push·리뷰 방식이 모드에 갈리므로 **작업 전 먼저 판정**한다
 - **작업 단위 = 커밋 = push 단위** — 서로 다른 scope 변경을 한 커밋에 섞지 않는다. dirty tree 는 scope 별 분할 커밋.
 - **명시 staging (세션 격리)** — `git add <명시 경로>` 만. `git add -A` / `git add .` **금지**. 작업공간을 여러 세션이 공유하면 working tree 에 **타 세션의 미커밋 변경**이 섞일 수 있으므로 **이번 세션이 만든 파일만** staging 한다. commit 직전 `git diff --cached --name-only` 로 staged 범위가 이번 세션 산출물과 일치하는지 검증. 무관한 dirty 파일은 건드리지 않는다(모호하면 1줄 확인).
 - **세션 격리 자동화 (설치 시)** — `hooks/git_workflow-track.py`(PostToolUse) 가 이 세션이 수정한 파일을 `.git/git_workflow/sessions/<session_id>/touched` 에 누적하고, `hooks/git_workflow-reminder.py`(UserPromptSubmit) 가 git 트리거 시 그 목록을 주입한다 → staging 대상이 '이 세션 목록'으로 자동 grounding 된다(`.git` 내부라 비-커밋·세션별 분리). python 부재 시 이 자동화는 생략되고 규칙 텍스트만 생존(수동 식별).
-- **세션 격리 강제 게이트 (⟦CI⟧, 설치 시)** — `hooks/git_workflow-stage-gate.py`(PreToolUse) 가 타 세션 파일 staging 을, `hooks/git_workflow-push-gate.py`(PreToolUse) 가 **타 세션 커밋이 섞인 `main` 직접 push** 를 하드 차단한다(후자는 `hooks/git_workflow-commit-track.py`(PostToolUse) 가 `.git` 내부에 기록한 이 세션 커밋 해시로 판정). 이로써 아래 §2-1 세션 브랜치가 권고가 아니라 **강제**된다. override: 명령에 `# gw:allow-foreign`(staging) / `# gw:allow-main-push`(push).
-- **세션 격리 강제 (staging 게이트)** — `hooks/git_workflow-stage-gate.py`(PreToolUse·Bash) 가 `git add`/`git commit -a` 를 실행 직전 검사해 **하드 차단(deny)**: 광역 staging(`-A`/`.`/`-u`/`-p`)·`git commit -a`·glob 경로, 그리고 이 세션 touched 목록에 없는 **타 세션/미추적 파일**. 멀티 세션이 working tree 를 공유할 때(예: 한 창의 다중 탭) 타 세션 미커밋 파일 **캡처를 능동 차단**한다. 정당한 예외(Bash 산출물 등)는 명령에 `# gw:allow-foreign` 또는 env `GW_ALLOW_FOREIGN=1` 로 우회. **한계(정직)**: 셸 파싱 휴리스틱(`eval`·`xargs`·git alias·`cd &&` 우회 가능), 훅 미설치 세션은 미보호, Bash 로만 만든 파일은 미추적→override 필요, `git commit <path>` 미검사.
+- **세션 격리 강제 게이트 (⟦CI⟧, 설치 시)** — 세 게이트가 staging·commit·push 전 구간을 하드 차단한다. 이로써 아래 §2-1 세션 브랜치가 권고가 아니라 **강제**된다.
+  | 게이트 | 시점 | 차단 대상 | override |
+  | --- | --- | --- | --- |
+  | `hooks/git_workflow-stage-gate.py` | PreToolUse | 타 세션 파일 staging·광역 staging(`-A`/`.`) | `# gw:allow-foreign` |
+  | `hooks/git_workflow-commit-gate.py` | PreToolUse | **타 세션 활동 중 보호 브랜치(`main`/`master`) 직접 커밋** | `# gw:allow-main-commit` |
+  | `hooks/git_workflow-push-gate.py` | PreToolUse | 타 세션 커밋이 섞인 `main` 직접 push (+ 판정 불가한 첫 push 도 타 세션 활동 시 차단) | `# gw:allow-main-push` |
+
+  판정 근거는 `hooks/git_workflow-track.py`(PostToolUse) 가 기록한 세션별 수정 파일과 `hooks/git_workflow-commit-track.py`(PostToolUse) 가 기록한 세션 커밋 해시(둘 다 `.git` 내부 → 비-커밋·세션별 분리). **단일 세션이면 세 게이트 모두 통과**하므로 §2 기본(main 직접 커밋·push)은 그대로 동작한다.
+  각 게이트의 override 는 env 로도 가능하다(`GW_ALLOW_FOREIGN`·`GW_ALLOW_MAIN_COMMIT`·`GW_ALLOW_MAIN_PUSH` = `1`). **한계(정직, 세 게이트 공통)**: 셸 파싱 휴리스틱(`eval`·`xargs`·git alias·`cd &&` 우회 가능), 훅 미설치 세션은 미보호(타 세션 판정도 그 세션의 `track.py` 기록에 의존), Bash 로만 만든 파일은 미추적→override 필요, `git commit <path>` 미검사, detached HEAD·rebase/merge 중 커밋은 commit-gate 판정 대상 외.
 - **커밋 메시지** — `type(scope): subject` (`feat`·`fix`·`docs`·`refactor`·`style`·`chore`·`test`). 한국어 본문 허용. `Co-Authored-By` 푸터.
 - **파괴 명령 승인** — `git push --force`·`reset --hard`·`clean -f`·브랜치 삭제는 사용자 명시 승인 후에만.
 - **push 전 확인** — secrets(`.env`·키·토큰·사설 IP(Internet Protocol)/MAC(Media Access Control)·운영 endpoint) 미포함, 대상 저장소 정확, vendored read-only 가드 파일 미staged.
@@ -51,7 +58,7 @@ push·리뷰 방식이 모드에 갈리므로 **작업 전 먼저 판정**한다
 - `main`(또는 현재 추적 분기) **직접 commit + push**. PR(Pull Request) 미사용.
 - 다중 원격이면: `git push origin main && git push fito main`.
 
-### 2-1. 세션별 브랜치 관례 (solo + 다중 세션 공유 워킹트리 — 선택)
+### 2-1. 세션별 브랜치 관례 (solo + 다중 세션 공유 워킹트리 — 훅 설치 시 강제)
 
 여러 세션(예: 한 창의 다중 탭)이 **같은 저장소·워킹트리·`main` 을 공유**하면, 각 세션 커밋이 공유 `main` 위에 교차되어 이력 추적·동시 push 충돌 관리가 어렵다. 이때 아래 경량 관례를 적용해 세션 산출물을 이력상 격리한다. **solo 모드 선언은 유지**(§0 불변)하되, 각 세션은 `main` 에 직접 push 하지 않고 자기 브랜치로 격리하고, `main` 반영(merge)은 **사용자가 수행**한다.
 
@@ -122,10 +129,16 @@ done
 # (gh 불가 시) 최근 author 수
 git log -50 --format='%ae' 2>/dev/null | sort -u | wc -l
 
+# §2-1 적용조건 판정 — 커밋/푸시 전 필수 (충족 시 main 직접 커밋·push 금지)
+gd=$(git rev-parse --absolute-git-dir 2>/dev/null)
+others=$(find "$gd/git_workflow/sessions" -mindepth 2 -maxdepth 2 -name touched -size +0 2>/dev/null | wc -l)
+echo "worktree $(git worktree list | wc -l)개 · 활동 세션 ${others}개 · HEAD=$(git rev-parse --abbrev-ref HEAD)"
+[ "$others" -gt 1 ] && echo "→ §2-1 적용: session/<id> 브랜치로 격리(main 직접 커밋·push 금지)"
+
 # 커밋 메시지 형식 (마지막 커밋)
 git log -1 --format='%s' | grep -E "^(feat|fix|docs|refactor|style|chore|test)(\([^)]+\))?: "
 ```
 
 ---
 
-**VERSION**: 1.5.0 (1.4.0 + §2-1 세션별 브랜치 관례(solo 다중세션 공유 워킹트리 — `session/<id>` 브랜치 커밋·push, main merge 는 사용자 소관, team PR·리뷰 게이트 미도입))
+**VERSION**: 1.6.0 (1.5.0 + §2-1 강제 완결 — commit-gate 신설(타 세션 활동 중 보호 브랜치 직접 커밋 차단), push-gate 첫-push 구멍 보강(판정 불가 시 타 세션 활동이면 override 요구), §2-1 헤더 '선택'→'훅 설치 시 강제' 정합화, §자체 점검에 적용조건 판정 추가)
