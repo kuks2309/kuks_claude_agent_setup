@@ -68,7 +68,7 @@ def git_dir(cwd):
         out = subprocess.run(["git", "-C", cwd, "rev-parse", "--absolute-git-dir"],
                              capture_output=True, text=True, timeout=3)
         if out.returncode == 0:
-            return out.stdout.strip()
+            return out.stdout.rstrip("\n")  # 경로 후행 공백 보존(.strip 금지)
     except (OSError, subprocess.SubprocessError):
         pass
     return None
@@ -159,7 +159,7 @@ def main():
     # 활성화 판정은 저장소 최상위 기준 — 하위 디렉토리로 cd 해도 게이트가 꺼지지 않게.
     gr = subprocess.run(["git", "-C", cwd, "rev-parse", "--show-toplevel"],
                         capture_output=True, text=True)
-    root = gr.stdout.strip() if gr.returncode == 0 else cwd
+    root = gr.stdout.rstrip("\n") if gr.returncode == 0 else cwd
     if not os.path.isfile(os.path.join(root, *RULE_MD.split("/"))):
         return  # 번들 미설치 저장소 → 간섭 안 함
     if "gw:allow-foreign" in cmd or \

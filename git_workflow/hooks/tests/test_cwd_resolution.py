@@ -142,6 +142,29 @@ def test_no_cd_unchanged_behavior():
     assert _denied(out), "cd 없는 main 커밋은 종전대로 차단돼야 함"
 
 
+def test_repo_path_with_trailing_space_still_gated():
+    """저장소 경로가 공백으로 끝나도 게이트가 살아 있어야 함.
+
+    회귀 방지: `rev-parse --show-toplevel` 결과에 .strip() 를 쓰면 후행 공백이
+    지워져 룰 파일을 못 찾고 게이트 3종이 조용히 비활성화된다(실제 프로젝트
+    경로가 `…/LGIT-C6-Cobot ` 처럼 공백으로 끝나 발현).
+    """
+    base = tempfile.mkdtemp()
+    proj = os.path.join(base, "repo trailing ")   # ← 후행 공백
+    os.makedirs(proj)
+    subprocess.run(["git", "init", "-q", "-b", "main", proj], check=True)
+    _git(proj, "config", "user.email", "t@t")
+    _git(proj, "config", "user.name", "t")
+    _git(proj, "config", "commit.gpgsign", "false")
+    d = os.path.join(proj, "docs", "claude_guideline", "git_workflow")
+    os.makedirs(d)
+    open(os.path.join(d, "git_workflow.md"), "w").close()
+    _commit(proj, "a.txt", "base")
+    _touch_session(proj, "OTHER", "their.txt")
+    out = _run(CGATE, proj, "git commit -m x", "MINE")
+    assert _denied(out), "후행 공백 경로에서 게이트가 비활성화됨(.strip 회귀)"
+
+
 def test_nonexistent_cd_path_stays_conservative():
     """존재하지 않는 경로로 cd → 기준 유지(보수적)."""
     proj = _init_repo()
