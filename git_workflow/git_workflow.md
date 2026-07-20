@@ -47,7 +47,7 @@ push·리뷰 방식이 모드에 갈리므로 **작업 전 먼저 판정**한다
   | `hooks/git_workflow-push-gate.py` | PreToolUse | 타 세션 커밋이 섞인 `main` 직접 push (+ 판정 불가한 첫 push 도 타 세션 활동 시 차단) | `# gw:allow-main-push` |
 
   판정 근거는 `hooks/git_workflow-track.py`(PostToolUse) 가 기록한 세션별 수정 파일과 `hooks/git_workflow-commit-track.py`(PostToolUse) 가 기록한 세션 커밋 해시(둘 다 `.git` 내부 → 비-커밋·세션별 분리). **단일 세션이면 세 게이트 모두 통과**하므로 §2 기본(main 직접 커밋·push)은 그대로 동작한다.
-  각 게이트의 override 는 env 로도 가능하다(`GW_ALLOW_FOREIGN`·`GW_ALLOW_MAIN_COMMIT`·`GW_ALLOW_MAIN_PUSH` = `1`). **한계(정직, 세 게이트 공통)**: 셸 파싱 휴리스틱(`eval`·`xargs`·git alias·`cd &&` 우회 가능), 훅 미설치 세션은 미보호(타 세션 판정도 그 세션의 `track.py` 기록에 의존), Bash 로만 만든 파일은 미추적→override 필요, `git commit <path>` 미검사, detached HEAD·rebase/merge 중 커밋은 commit-gate 판정 대상 외.
+  각 게이트의 override 는 env 로도 가능하다(`GW_ALLOW_FOREIGN`·`GW_ALLOW_MAIN_COMMIT`·`GW_ALLOW_MAIN_PUSH` = `1`). **판정 기준 저장소** — 명령 안의 선행 `cd <경로>` 를 반영해 *실제 대상 저장소* 를 기준으로 판정하고(다른 저장소 작업의 오탐 방지), 활성화 여부는 그 저장소의 **최상위(toplevel)** 에서 본 룰 파일 존재로 정한다(하위 디렉토리로 `cd` 해도 게이트가 꺼지지 않음). 변수·명령치환(`cd $D`)처럼 해석 불가하면 세션 cwd 기준을 유지한다(보수적). **한계(정직, 세 게이트 공통)**: 셸 파싱 휴리스틱(`eval`·`xargs`·git alias 우회 가능), 훅 미설치 세션은 미보호(타 세션 판정도 그 세션의 `track.py` 기록에 의존), Bash 로만 만든 파일은 미추적→override 필요, `git commit <path>` 미검사, detached HEAD·rebase/merge 중 커밋은 commit-gate 판정 대상 외.
 - **커밋 메시지** — `type(scope): subject` (`feat`·`fix`·`docs`·`refactor`·`style`·`chore`·`test`). 한국어 본문 허용. `Co-Authored-By` 푸터.
 - **파괴 명령 승인** — `git push --force`·`reset --hard`·`clean -f`·브랜치 삭제는 사용자 명시 승인 후에만.
 - **push 전 확인** — secrets(`.env`·키·토큰·사설 IP(Internet Protocol)/MAC(Media Access Control)·운영 endpoint) 미포함, 대상 저장소 정확, vendored read-only 가드 파일 미staged.
@@ -141,4 +141,4 @@ git log -1 --format='%s' | grep -E "^(feat|fix|docs|refactor|style|chore|test)(\
 
 ---
 
-**VERSION**: 1.6.0 (1.5.0 + §2-1 강제 완결 — commit-gate 신설(타 세션 활동 중 보호 브랜치 직접 커밋 차단), push-gate 첫-push 구멍 보강(판정 불가 시 타 세션 활동이면 override 요구), §2-1 헤더 '선택'→'훅 설치 시 강제' 정합화, §자체 점검에 적용조건 판정 추가)
+**VERSION**: 1.6.1 (1.6.0 + 게이트 판정 기준 저장소 해석 수정 — 선행 `cd <경로>` 반영으로 타 저장소 작업 오탐 제거, 활성화 판정을 저장소 최상위 기준으로 변경해 하위 디렉토리 cd 우회 차단)
