@@ -42,7 +42,7 @@ def _git(cwd, *args):
             capture_output=True, text=True, timeout=3,
         )
         if out.returncode == 0:
-            return out.stdout.strip()
+            return out.stdout.rstrip("\n")  # 경로 후행 공백 보존(.strip 금지)
     except (OSError, subprocess.SubprocessError):
         pass
     return None
