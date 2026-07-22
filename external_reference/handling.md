@@ -32,6 +32,7 @@ cd external_reference && ./install.sh <타깃-프로젝트-루트> [도메인...
 - **저장 폴더가 없으면 만든다 (승인 불요)** — 첫 보관·다운로드 시 `references/<vendor>/<product>/` 경로를 자동 생성한다.
 - **저장 폴더가 표준과 다르면 표준 경로로 정규화한다** — 기존 참조 문서가 비표준 위치(예: `docs/references/`, `docs/manual/`, `manuals/`, `datasheets/`, 단수 `reference/`, 루트 산재)에 있으면 `references/<vendor>/<product>/` 로 이동하고, 그 문서를 가리키던 인용·링크를 **모두 갱신**한 뒤 이동 내역을 작업 보고에 남긴다. 모든 프로젝트가 동일 경로 규약을 따르게 하기 위함이다.
 - 외부 벤더 매뉴얼은 `references/<vendor>/<product>/` 하위에 보관한다.
+- **다품목 벤더는 제품분야(category) 계층을 선택적으로 끼운다 (3단계)** — 한 제조사가 여러 제품군(예: 모터·센서·컨트롤러·감속기)을 다룰 때는 `references/<제조사>/<제품분야>/<제품명>/` 3단계 경로를 쓸 수 있다 (예: `references/huayan/motor/spec25/`). 기본은 2단계 `<vendor>/<product>` 이고, 3단계는 제품군 구분이 필요할 때의 확장이다. **한 프로젝트 안에서는 2단계·3단계 중 하나로 일관**되게 쓴다(혼용 금지). 3단계를 쓰면 파생물도 `docs/<제조사>/<제품분야>/<제품명>/` 로 references 와 **동일 taxonomy** 를 맞춰 1차 source↔파생물 대응을 경로로 추적한다.
 - 모듈에 강하게 결합된 매뉴얼은 모듈 내부(예: `<모듈경로>/references/`)에 둘 수도 있으며, 위치는 모듈 CLAUDE.md 가 결정한다.
 - 원본 파일명을 가급적 유지하되, 경로·검색이 불편하면 `<vendor>_<product>_<version>.pdf` 형식으로 정규화한다.
 - PDF 가 우선이며, 변환본(텍스트 추출 등)은 원본과 함께 보관한다 (예: `pdftotext -layout` 결과를 `.txt` 로 같이 저장).
@@ -218,4 +219,4 @@ grep -nE "\]\((docs/references|docs/manual|manual|manuals|datasheets|reference)/
 
 ---
 
-**VERSION**: 2.0.0 (코어 분리판 — external_reference_handling.md v1.0.0 기반, 도메인 Add-on sub-file 분리)
+**VERSION**: 2.1.0 (2.0.0 + §1 선택적 제품분야(category) 계층 — 다품목 벤더용 3단계 `<vendor>/<category>/<product>` 경로 규약 + `docs/` 파생물 동일 taxonomy 명문화)
