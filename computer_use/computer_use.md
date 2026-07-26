@@ -2,7 +2,9 @@
 
 PC 화면을 캡처해 분석하고, 실제 마우스·키보드로 조작하는 Claude Code 자산의
 단일 근원(SSOT). 읽기 절반(`capture-test`)과 쓰기 절반(`computer-use`)을 한
-번들로 묶어 전역(`~/.claude`) 설치한다.
+번들로 묶어 전역(`~/.claude`) 설치한다. `computer-use` 는 `capture-test` 를
+read·analyze 단계로 **포함**하는 상위 루프다(포괄 관계). 각 규칙의 서술처는
+해당 SKILL.md 이며, 본 개요 문서는 재서술하지 않는다.
 
 ## 구성
 
@@ -34,6 +36,7 @@ python3 ~/.claude/computer_action.py <action> ... --dry-run   # 실행 없이 �
 사전 차단이 아니라 **사후 피드백**으로 안전을 확보한다: action 실행 → 즉시
 재캡처 → 결과 보고 → 사용자 피드백(계속/수정/중지). 기본 매 스텝, `autorun N`
 이면 N 스텝 연속 후 보고. 사용자가 부를 때만 동작하며 백그라운드 감시는 없다.
+(규범 전문·비가역 동작 정지 조항은 `skills/computer-use/SKILL.md` 안전 원칙 절)
 
 ## 좌표
 
@@ -42,7 +45,8 @@ python3 ~/.claude/computer_action.py <action> ... --dry-run   # 실행 없이 �
 
 ## 플랫폼
 
-- Linux X11: `xdotool` + `x11-utils`. **Wayland 미지원**(감지 시 거부).
+- Linux X11: `xdotool` + `x11-utils`(읽기·쓰기 공통), `wmctrl`(쓰기 전용 — 제목
+  기반 창 전환). **Wayland 미지원**(감지 시 거부).
 - Windows: `pyautogui`.
 
 ## 설치 / 제거
