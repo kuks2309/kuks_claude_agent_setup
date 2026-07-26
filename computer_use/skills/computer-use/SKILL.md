@@ -14,7 +14,8 @@ arguments:
 
 # Computer Use — 화면 읽기·분석·조작 루프
 
-읽기 전용 `capture-test` 를 확장하여 분석 결과를 실제 입력으로 연결한다.
+읽기 전용 `capture-test` 를 read·analyze 단계로 **포함**하는 상위 루프로,
+그 분석 결과를 실제 입력으로 연결한다.
 읽기 = `~/.claude/capture_screen.py`, 쓰기 = `~/.claude/computer_action.py`.
 사용자가 호출할 때만 동작하며, 백그라운드로 화면을 감시하지 않는다.
 
@@ -25,36 +26,29 @@ arguments:
 뒤 즉시 재캡처해 결과를 사용자에게 보고하고, 사용자가 계속/수정/중지를
 선택한다. 기본은 매 스텝 보고, `autorun N` 이면 N 스텝 연속 후 보고한다.
 
+**비가역 동작 정지**: 삭제·전송(폼 submit·메일 Send)·결제·파일 덮어쓰기(ctrl+s)·
+창 닫기 등 되돌리기 어려운 동작 앞에서는 `autorun N` 중이라도 1회 멈춰 사용자
+확인을 받는다(computer-operator 에이전트와 동일 규칙).
+
 ## 워크플로
 
 ### Step 1: 목표 확인
 `goal` 인자가 있으면 그대로, 없으면 사용자에게 무엇을 시킬지 묻는다.
 
 ### Step 2: 대상 창 준비 + 화면 읽기 (캡처)
-**먼저 조작할 대상 앱 창을 앞으로 올린다(raise/activate).** 상위에 다른 창이
-덮여 있으면(z-order) 이후 클릭·타이핑이 **엉뚱한 창에 들어갈 수 있다**. 대상
-창을 `--mode window` 로 캡처하면 캡처 전 그 창을 자동으로 앞으로 올린다(창 id
-는 `--mode list` 로 확인).
+**캡처 절차·저장 경로(`--project`)·창 id·다중 모니터·DPI 규칙의 서술처는
+`~/.claude/skills/capture-test/SKILL.md` 다.** 본 스킬은 그 절차를 read 단계로
+그대로 사용한다 — 세부가 필요하면 위 파일을 Read 로 참조하라. 아래는 쓰기(act)
+관점의 추가 규칙이다:
 
-```bash
-# 대상 창을 앞으로 올리며 캡처 (권장)
-python3 ~/.claude/capture_screen.py --mode list                      # 창 id 확인(--project 불필요)
-python3 ~/.claude/capture_screen.py --project "{프로젝트 루트}" --mode window --window-id <id> --label "cu_step"
-# 또는 전체 화면 (대상 창이 이미 최상위·포커스임이 확실할 때)
-python3 ~/.claude/capture_screen.py --project "{프로젝트 루트}" --mode full --label "cu_step"
-```
-
-- **저장 경로(캡처 모드는 `--project` 필수)**: 캡처 파일은 `{프로젝트 루트}/experiments/capture/YYYYMMDD_HHMMSS_<label>.png` 에 저장된다(디렉터리 자동 생성, 성공 시 stdout 에 저장 경로 출력). `--project` 에는 **현재 작업 프로젝트 루트의 절대 경로**를 넣는다 — 상대경로·임의 이름을 넣으면 `{cwd}/<그 이름>/experiments/capture/` 가 중첩 생성되는 사고가 난다. 프로젝트 루트에 쓰기 권한이 없으면 `--project ~`(→ `~/experiments/capture/`) 로 폴백. capture-test 스킬과 동일 규칙이며 Step 5 재캡처도 같은 `--project` 를 쓴다.
-- **창 id**: Linux(X11)=16진 `0x2800008`, Windows=hwnd 10진(또는 `0x`16진). 둘 다 `--mode list` 출력의 `id` 값을 그대로 넣는다. `--mode window` 는 두 플랫폼 모두 캡처 전 대상 창을 자동으로 앞으로 올린다(Windows 는 추가 `xdotool` 불필요; Linux 는 명시 포커스 시 `xdotool windowactivate <id>`).
-- **다중 모니터**: `--mode monitors` 로 각 모니터의 offset·크기와 가상 데스크톱 범위를 먼저 확인한다. 특정 모니터 전체는 `--mode full --monitor N`(N 은 monitors 출력의 `monitor_arg`).
-- **Windows 실행**: 예시의 `python3` 대신 `python` 을 사용한다(`python3` 는 Store 앨리어스로 잡혀 실패할 수 있음).
-
-좌표는 가상 데스크톱 전체의 절대 물리 픽셀이다(전체화면 1:1; 창 모드는 창
-offset 을 더함). 다중 모니터에서 2번째 모니터는 첫 모니터 폭만큼 x 가 이어진다
-(예: `--mode monitors` 가 `left:2560` 이면 그 모니터 좌표는 2560~). Windows 는
-스크립트가 per-monitor DPI 인식을 설정하므로 배율≠100% 에서도 좌표가 캡처
-픽셀과 일치한다. 조작 후 Step 5 재캡처의 화면 변화로 대상 창이 맞았는지 반드시
-재확인한다.
+- **조작 전 대상 창을 반드시 앞으로 올린다(raise).** 상위에 다른 창이 덮여
+  있으면(z-order) 이후 클릭·타이핑이 **엉뚱한 창에 들어간다**. 조작 루프의
+  캡처는 자동 raise 되는 `--mode window` 를 기본으로 한다.
+- 재캡처(Step 5)는 같은 `--project` 로 실행해 사전·사후 증적을 같은 위치에
+  남긴다.
+- (빠른 참조) `--mode list` 로 창 id 확인 후:
+  `python3 ~/.claude/capture_screen.py --project "{프로젝트 루트}" --mode window --window-id <id> --label "cu_step"`
+  — 규칙 전문·다른 모드는 capture-test SKILL.md 참조.
 
 ### Step 3: 분석 + 다음 action 결정
 Read 도구로 캡처 이미지를 읽고 목표 대비 현재 화면을 분석한다. 다음 한
@@ -96,18 +90,19 @@ Step 2 와 동일하게 재캡처하고 Read 로 비교한다. "실행한 동작
 좌표를 재추론한 뒤 보정한다.
 
 ## 환경 요구
-- Linux(X11): `xdotool`, `x11-utils`, `wmctrl` 필요. Wayland 미지원. 미설치 시:
-  ```bash
-  sudo apt-get install -y xdotool x11-utils wmctrl
-  ```
-  - `xdotool`: 마우스·키 입력, 창 id 기반 활성화(`xdotool search --name Chrome windowactivate`)
-  - `wmctrl`: 제목 기반 창 전환 한 줄(`wmctrl -a "Machines"`)
-- Windows: `pyautogui` 필요(`pygetwindow`·`pillow`·`mss` 는 pyautogui 의존성으로
-  함께 설치됨). 미설치 시: `python -m pip install --user pyautogui pillow mss`.
-  창 활성화는 pygetwindow + Win32 `SetForegroundWindow` 가 담당하므로 wmctrl 같은
-  별도 외부 도구 불필요. `--mode list`/`window`/`monitors`, 클릭·타이핑·키 입력, 다중
-  모니터·DPI 배율 모두 지원(실기 검증 완료). 명령은 `python` 으로 실행.
-- 설치: 번들의 `install.sh`(Linux/macOS) 또는 `install.ps1`(Windows). 전역
-  `~/.claude` 설치이므로 어느 프로젝트에서든 사용 가능.
-- **사용 전 install.sh 선행 필요** — 스킬은 `~/.claude/computer_action.py`·
-  `~/.claude/capture_screen.py` 를 참조하므로 미설치 시 "파일 없음"으로 실패한다.
+- 읽기(캡처) 의존성은 `~/.claude/skills/capture-test/SKILL.md` 환경 요구를
+  따른다.
+- 쓰기(입력) 추가 의존성:
+  - Linux(X11): `xdotool`(마우스·키 입력, 창 id 기반 활성화), `wmctrl`(제목 기반
+    창 전환 한 줄 `wmctrl -a "..."`). Wayland 미지원. 미설치 시:
+    ```bash
+    sudo apt-get install -y xdotool x11-utils wmctrl
+    ```
+  - Windows: `pyautogui` 필요(`pygetwindow`·`pillow`·`mss` 동반 설치). 미설치 시:
+    `python -m pip install --user pyautogui pillow mss`. 창 활성화는 pygetwindow +
+    Win32 `SetForegroundWindow` 가 담당 — 별도 외부 도구 불필요. 명령은 `python`
+    으로 실행(실기 검증 완료).
+- 설치: 번들의 `install.sh`(Linux/macOS) 또는 `install.ps1`(Windows) **선행 필요**
+  — 스킬은 `~/.claude/computer_action.py`·`~/.claude/capture_screen.py` 를
+  참조하므로 미설치 시 "파일 없음"으로 실패한다. 전역 `~/.claude` 설치이므로
+  어느 프로젝트에서든 사용 가능.
