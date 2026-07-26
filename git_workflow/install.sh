@@ -67,7 +67,7 @@ record_install() {
 drift_pairs() {
   printf '%s\t%s\n' "$SRC/git_workflow.md" "$DEST/git_workflow.md"
   local h
-  for h in "$SRC/hooks/"*.py; do
+  for h in "$SRC/hooks/"*.py "$SRC/hooks/"*.sh; do
     [ -f "$h" ] || continue
     printf '%s\t%s\n' "$h" "$DEST/hooks/$(basename "$h")"
   done
@@ -156,14 +156,15 @@ else
   echo "✓ CLAUDE.md 등록 추가"
 fi
 
-# 훅 3종 — (1) reminder: 트리거 게이트로 SOP+모드+세션 파일 주입(UserPromptSubmit)
-#          (2) track: 파일 수정 도구 사용 시 세션별 수정 파일 기록(PostToolUse)
-#          (3) stage-gate: git add/commit-a 가 타 세션 파일 캡처를 막음(PreToolUse·Bash)
+# 훅 6종 — reminder(UserPromptSubmit)·track(PostToolUse·파일)·commit-track(PostToolUse·Bash)
+#          ·stage-gate(PreToolUse·Bash)·push-gate(PreToolUse·Bash)
+#          ·session-end(SessionEnd: session/<id> 브랜치 → main 안전 병합, git_workflow-session.sh)
 if ls "$SRC/hooks/"*.py >/dev/null 2>&1; then
   mkdir -p "$DEST/hooks"
   cp "$SRC/hooks/"*.py "$DEST/hooks/"
-  chmod +x "$DEST/hooks/"*.py 2>/dev/null || true
-  echo "✓ 훅 복사: docs/claude_guideline/$BUNDLE/hooks/*.py"
+  for sh in "$SRC/hooks/"*.sh; do [ -f "$sh" ] && cp "$sh" "$DEST/hooks/"; done
+  chmod +x "$DEST/hooks/"*.py "$DEST/hooks/"*.sh 2>/dev/null || true
+  echo "✓ 훅 복사: docs/claude_guideline/$BUNDLE/hooks/*.{py,sh}"
   PYBIN=""
   for c in python3 python; do
     if command -v "$c" >/dev/null 2>&1; then PYBIN="$c"; break; fi
@@ -181,10 +182,11 @@ if ls "$SRC/hooks/"*.py >/dev/null 2>&1; then
     CTRACK_CMD="$PYBIN \"$HOOK_BASE/$BUNDLE-commit-track.py\""
     CGATE_CMD="$PYBIN \"$HOOK_BASE/$BUNDLE-commit-gate.py\""
     PUSHGATE_CMD="$PYBIN \"$HOOK_BASE/$BUNDLE-push-gate.py\""
-    "$PYBIN" - "$SETTINGS" "$REMINDER_CMD" "$TRACK_CMD" "$GATE_CMD" "$CTRACK_CMD" "$PUSHGATE_CMD" "$CGATE_CMD" <<'PYEOF'
+    SESSIONEND_CMD="$PYBIN \"$HOOK_BASE/$BUNDLE-session-end.py\""
+    "$PYBIN" - "$SETTINGS" "$REMINDER_CMD" "$TRACK_CMD" "$GATE_CMD" "$CTRACK_CMD" "$PUSHGATE_CMD" "$CGATE_CMD" "$SESSIONEND_CMD" <<'PYEOF'
 import json, sys
 settings_path = sys.argv[1]
-reminder_cmd, track_cmd, gate_cmd, ctrack_cmd, pushgate_cmd, cgate_cmd = sys.argv[2:8]
+reminder_cmd, track_cmd, gate_cmd, ctrack_cmd, pushgate_cmd, cgate_cmd, sessionend_cmd = sys.argv[2:9]
 try:
     with open(settings_path, encoding="utf-8") as f:
         cfg = json.load(f)
@@ -192,12 +194,12 @@ except (FileNotFoundError, json.JSONDecodeError):
     cfg = {}
 hooks = cfg.setdefault("hooks", {})
 
-def register(event, cmd, matcher=None):
+def register(event, cmd, matcher=None, timeout=5):
     groups = hooks.setdefault(event, [])
     if any(h.get("command") == cmd for g in groups for h in g.get("hooks", [])):
         print("• settings.json %s 훅 이미 존재 — 스킵" % event)
         return
-    entry = {"hooks": [{"type": "command", "command": cmd, "timeout": 5}]}
+    entry = {"hooks": [{"type": "command", "command": cmd, "timeout": timeout}]}
     if matcher:
         entry["matcher"] = matcher
     groups.append(entry)
@@ -209,6 +211,7 @@ register("PostToolUse", ctrack_cmd, matcher="Bash")
 register("PreToolUse", gate_cmd, matcher="Bash")
 register("PreToolUse", cgate_cmd, matcher="Bash")
 register("PreToolUse", pushgate_cmd, matcher="Bash")
+register("SessionEnd", sessionend_cmd, timeout=100)
 
 with open(settings_path, "w", encoding="utf-8") as f:
     json.dump(cfg, f, ensure_ascii=False, indent=2)

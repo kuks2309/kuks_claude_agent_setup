@@ -67,14 +67,11 @@ push·리뷰 방식이 모드에 갈리므로 **작업 전 먼저 판정**한다
 - **적용 조건** — 다중 세션이 워킹트리를 공유할 때만(`git worktree list` 가 트리 1개 + 다른 세션이 같은 트리를 수정). 단일 세션이면 §2 기본(main 직접 push)으로 충분.
 - **브랜치 명명** — `session/<session-id>` (예: `session/6c0ee226`). 식별자는 세션 격리 훅(`git_workflow-reminder.py`)이 주입하는 `<session_id>` 를 쓴다.
 - **격리 대상 = 이 세션의 산출물만** — **공유 가변 로그**(`docs/user_instructions/user_instructions.md` 등 모든 세션이 append 하는 파일)는 세션 브랜치에 넣지 않는다(브랜치마다 다른 스냅샷 → merge 충돌). 그런 로그는 `main` 에 직접 커밋(§2)하거나 로그 소유 세션이 일괄 커밋한다. 세션 브랜치에는 **그 세션만 만든 코드·문서 산출물**만 담는다.
-- **작업 흐름 (worktree)** —
-  1. `git worktree add <경로>/kkw-session-<id> -b session/<id>` (공유 HEAD 불변, main 기준 새 브랜치).
-  2. 이 세션 산출물을 그 worktree 로 반영 후 `cd` 하여 §1 규칙대로 커밋(명시 staging·`type(scope): subject`+`Co-Authored-By`).
-  3. `git -C <경로> push -u origin session/<id>` — **`main` 직접 push 안 함**(다중 원격이면 각 원격에).
-  4. `git worktree remove <경로>` 로 링크드 트리 정리.
-- **merge (사용자 소관)** — 세션 브랜치를 `main` 에 반영하는 merge 는 **사용자가 수행**한다. Claude 자동 merge 금지. 사용자가 `git merge --no-ff session/<id>` 또는 원격 UI 로 처리.
-- **정리** — merge 후 `git branch -d session/<id>` + `git push origin --delete session/<id>` (브랜치 삭제는 §1 파괴 명령 — 사용자 명시 승인 후).
-- **team 과의 구분** — 본 관례는 §3 team 의 PR·리뷰 승인 게이트를 도입하지 **않는다**. 브랜치 목적은 협업 리뷰가 아니라 **세션 이력 격리·동시 push 충돌 방지**뿐. team 의 self-merge 금지(§3)는 여기 해당 없음 — merge 주체가 사용자다.
+- **작업 흐름 (도구: `hooks/git_workflow-session.sh`, ⟦CI⟧ 자동화)** —
+  1. **시작**: `bash <…>/hooks/git_workflow-session.sh start <session_id>` → `origin/main` 기준 `../<repo>-ses-<id>` 링크드 worktree + `session/<id>` 브랜치 생성(공유 HEAD 불변). 출력된 그 폴더에서 작업·커밋한다(§1 규칙: 명시 staging·`type(scope): subject`+`Co-Authored-By`).
+  2. **종료(자동)**: SessionEnd 훅 `git_workflow-session-end.py` 가 자동으로 `session/<id>` 를 `main` 에 **안전 병합**(임시 worktree 에서 `origin/main` 최신 위로 병합, `merge.lock` **flock 직렬화** → 동시 종료도 경쟁 없음)하고 `origin`+`fito` 둘 다 push 후 **worktree·브랜치(로컬+원격) 정리**한다. 수동 실행: `git_workflow-session.sh end <session_id>`.
+  3. **충돌·발산 시**: 자동 병합을 **보류**(exit 3) — 브랜치·worktree 보존하고 사용자가 `git merge --no-ff session/<id>` 로 수동 해결. Claude 는 충돌을 자동 해결하지 않는다.
+- **team 과의 구분** — 본 절차는 §3 team 의 PR·리뷰 승인 게이트를 도입하지 **않는다**. 브랜치 목적은 협업 리뷰가 아니라 **세션 이력 격리·동시 push 경쟁 방지**뿐. 병합은 훅이 무충돌일 때만 자동 수행(리뷰 게이트 아님), 충돌 시 사용자 몫.
 
 ## 3. team 모드 (여럿)
 
