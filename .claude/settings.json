@@ -29,6 +29,15 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/docs/claude_guideline/git_workflow/hooks/git_workflow-session-end.py\"",
+            "timeout": 100
+          }
+        ]
       }
     ],
     "PostToolUse": [
