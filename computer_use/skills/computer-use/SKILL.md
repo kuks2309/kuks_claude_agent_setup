@@ -69,6 +69,14 @@ python3 ~/.claude/computer_action.py scroll --x 960 --y 540 --direction down --a
 triple_click drag type key scroll wait`. 각 호출은 결과 JSON 한 줄을 출력한다
 (`{"ok":true,...}` / `{"ok":false,"error":...}`).
 
+- **`scroll --amount` 의 단위는 휠 칸(notch) 이며 두 플랫폼이 같다**(기본 3).
+  Linux 는 `xdotool` 버튼 4/5 를 칸 수만큼 누르고, Windows 는 휠 델타 원시값을
+  받으므로 스크립트가 내부에서 `WHEEL_DELTA`(120) 를 곱해 단위를 맞춘다. 즉
+  `--amount 3` 은 어느 쪽에서든 3칸이다.
+- **⚠️ `ok:true` 는 화면이 실제로 바뀌었다는 뜻이 아니다.** 특히 스크롤은 대상이
+  스크롤 불가하거나 이미 끝에 닿았어도 성공으로 보고된다. 동작의 성패는 반드시
+  Step 5 재캡처의 화면 변화로 판단한다.
+
 ### Step 5: 재캡처 + 결과 보고
 Step 2 와 동일하게 재캡처하고 Read 로 비교한다. "실행한 동작 / 화면 변화 /
 목표 진척" 을 보고한다.
