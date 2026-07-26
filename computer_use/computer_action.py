@@ -13,6 +13,10 @@ these coordinates match the capture tool on displays scaled != 100%.
 
 Actions: move click double_click right_click middle_click triple_click
          drag type key scroll wait
+
+scroll's --amount is measured in wheel notches on every backend (default 3).
+Windows is scaled by WHEEL_DELTA internally, so the same --amount scrolls the
+same distance on Linux and Windows.
 """
 import argparse
 import json
@@ -152,6 +156,11 @@ def _plan_linux(action, args):
     return {"backend": "linux", "action": action, "ops": ops}
 
 
+# One wheel notch in Windows raw wheel-delta units (WinUser.h WHEEL_DELTA).
+# pyautogui.scroll() forwards its argument straight through as the delta, so an
+# unscaled `--amount 3` is 1/40th of a notch and scrolls nothing.
+_WHEEL_DELTA = 120
+
 _WIN_CLICK = {
     "click": "click",
     "double_click": "doubleClick",
@@ -180,8 +189,12 @@ def _plan_windows(action, args):
         x, y = _require_xy(args)
         direction = args.get("direction") or "down"
         amount = int(args.get("amount") or 3)
-        clicks = amount if direction == "up" else -amount
-        ops = [{"call": "moveTo", "args": [x, y]}, {"call": "scroll", "args": [clicks]}]
+        # --amount is wheel notches on every backend. Linux presses button 4/5
+        # once per notch; Windows wants a raw delta, so scale by WHEEL_DELTA to
+        # keep `--amount 3` meaning the same thing on both platforms.
+        notches = amount if direction == "up" else -amount
+        ops = [{"call": "moveTo", "args": [x, y]},
+               {"call": "scroll", "args": [notches * _WHEEL_DELTA]}]
     elif action == "wait":
         ops = [{"sleep": float(args.get("duration") or 1.0)}]
     else:
