@@ -22,32 +22,13 @@ import shlex
 import subprocess
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import gw_common as gw  # noqa: E402
+
 RULE_MD = "docs/claude_guideline/git_workflow/git_workflow.md"
 SEG_SEP = re.compile(r"&&|\|\||;|\n|\|")
 PROTECTED = {"main", "master"}
 CD_RE = re.compile(r"^\s*cd\s+(?P<path>\"[^\"]*\"|'[^']*'|[^\s;&|]+)\s*$")
-
-
-def effective_cwd(cmd, base):
-    """명령 안의 선행 `cd <경로>` 를 반영한 판정 기준 디렉토리.
-
-    `cd <다른저장소> && git …` 처럼 대상 저장소가 세션 cwd 와 다를 때 그 저장소를
-    기준으로 판정하기 위함(오탐 방지). 해석 불가(변수·명령치환·`cd -`)면 base 유지.
-    """
-    cur = base
-    for seg in SEG_SEP.split(cmd):
-        m = CD_RE.match(seg.strip())
-        if not m:
-            continue
-        p = m.group("path")
-        if p[:1] in ("\"", "'"):
-            p = p[1:-1]
-        if "$" in p or "`" in p or p == "-":
-            return base  # 해석 불가 → 보수적으로 원래 기준 유지
-        cand = os.path.normpath(p if os.path.isabs(p) else os.path.join(cur, p))
-        if os.path.isdir(cand):
-            cur = cand
-    return cur
 
 
 def deny(reason):
@@ -130,7 +111,7 @@ def main():
     if "git" not in cmd or "commit" not in cmd:
         return
 
-    cwd = effective_cwd(cmd, data.get("cwd") or os.getcwd())
+    cwd = gw.target_dir(cmd, data.get("cwd") or os.getcwd())
     # 활성화 판정은 저장소 최상위 기준 — 하위 디렉토리로 cd 해도 게이트가 꺼지지 않게.
     root = _git(cwd, "rev-parse", "--show-toplevel") or cwd
     if not os.path.isfile(os.path.join(root, *RULE_MD.split("/"))):
