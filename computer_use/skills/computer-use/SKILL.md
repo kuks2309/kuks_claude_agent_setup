@@ -38,12 +38,13 @@ arguments:
 
 ```bash
 # 대상 창을 앞으로 올리며 캡처 (권장)
-python3 ~/.claude/capture_screen.py --mode list                      # 창 id 확인
-python3 ~/.claude/capture_screen.py --mode window --window-id <id> --label "cu_step"
+python3 ~/.claude/capture_screen.py --mode list                      # 창 id 확인(--project 불필요)
+python3 ~/.claude/capture_screen.py --project "{프로젝트 루트}" --mode window --window-id <id> --label "cu_step"
 # 또는 전체 화면 (대상 창이 이미 최상위·포커스임이 확실할 때)
-python3 ~/.claude/capture_screen.py --mode full --label "cu_step"
+python3 ~/.claude/capture_screen.py --project "{프로젝트 루트}" --mode full --label "cu_step"
 ```
 
+- **저장 경로(캡처 모드는 `--project` 필수)**: 캡처 파일은 `{프로젝트 루트}/experiments/capture/YYYYMMDD_HHMMSS_<label>.png` 에 저장된다(디렉터리 자동 생성, 성공 시 stdout 에 저장 경로 출력). `--project` 에는 **현재 작업 프로젝트 루트의 절대 경로**를 넣는다 — 상대경로·임의 이름을 넣으면 `{cwd}/<그 이름>/experiments/capture/` 가 중첩 생성되는 사고가 난다. 프로젝트 루트에 쓰기 권한이 없으면 `--project ~`(→ `~/experiments/capture/`) 로 폴백. capture-test 스킬과 동일 규칙이며 Step 5 재캡처도 같은 `--project` 를 쓴다.
 - **창 id**: Linux(X11)=16진 `0x2800008`, Windows=hwnd 10진(또는 `0x`16진). 둘 다 `--mode list` 출력의 `id` 값을 그대로 넣는다. `--mode window` 는 두 플랫폼 모두 캡처 전 대상 창을 자동으로 앞으로 올린다(Windows 는 추가 `xdotool` 불필요; Linux 는 명시 포커스 시 `xdotool windowactivate <id>`).
 - **다중 모니터**: `--mode monitors` 로 각 모니터의 offset·크기와 가상 데스크톱 범위를 먼저 확인한다. 특정 모니터 전체는 `--mode full --monitor N`(N 은 monitors 출력의 `monitor_arg`).
 - **Windows 실행**: 예시의 `python3` 대신 `python` 을 사용한다(`python3` 는 Store 앨리어스로 잡혀 실패할 수 있음).
