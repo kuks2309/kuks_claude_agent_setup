@@ -61,11 +61,18 @@ def repo_top(cwd):
 
 
 def state_root(cwd):
-    """상태 저장소 루트. 규칙 미설치·비-git 이면 None(no-op 게이트)."""
+    """상태 저장소 루트. 규칙 미설치면 None(no-op 게이트).
+
+    git 저장소면 .git 내부(비커밋·worktree 간 공유), 비-git 프로젝트면
+    <cwd>/.claude/session_workflow/ fallback — 목적 게이트·레지스트리·충돌
+    경보는 비-git 에서도 동작한다(미커밋 감지·handoff 는 git 전용).
+    """
     if not rule_active(cwd):
         return None
     gd = git_common_dir(cwd)
-    return os.path.join(gd, "session_workflow") if gd else None
+    if gd:
+        return os.path.join(gd, "session_workflow")
+    return os.path.join(cwd, ".claude", "session_workflow")
 
 
 def active_dir(root):
@@ -142,6 +149,31 @@ def is_stale(meta):
     except ValueError:
         return True
     return kst_now() - seen > timedelta(hours=STALE_HOURS)
+
+
+def behind_origin_main(cwd, do_fetch=True):
+    """공유 트리 HEAD 가 원격 기준(upstream, 없으면 origin/main) 대비 몇 커밋
+    뒤인지(stale 정도). 기준 부재·오류면 None.
+
+    fetch 는 best-effort(4초) — 실패해도 마지막 fetch 기준으로 계산한다(오프라인이면
+    과소평가 가능, 한계 문서화).
+    """
+    try:
+        if do_fetch:
+            subprocess.run(["git", "-C", cwd, "fetch", "origin", "--quiet"],
+                           capture_output=True, timeout=4)
+    except (OSError, subprocess.SubprocessError):
+        pass
+    for base in ("@{u}", "origin/main"):
+        try:
+            out = subprocess.run(
+                ["git", "-C", cwd, "rev-list", "--count", "HEAD.." + base],
+                capture_output=True, text=True, timeout=3)
+            if out.returncode == 0:
+                return int(out.stdout.strip())
+        except (OSError, subprocess.SubprocessError, ValueError):
+            pass
+    return None
 
 
 def one_line(text, limit=120):

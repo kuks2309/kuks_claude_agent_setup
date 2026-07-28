@@ -70,6 +70,12 @@ def main():
     else:
         lines.append("다른 활성 세션 없음.")
 
+    behind = ss.behind_origin_main(cwd)
+    if behind:
+        lines.append(f"⚠ 공유 트리가 원격(origin) 대비 {behind}커밋 낡음(stale) — "
+                     "광역 수정·재배치·삭제 작업 전에 최신화(pull) 또는 세션 worktree "
+                     "사용을 사용자와 1줄 확인하세요.")
+
     hd = ss.handoff_dir(root)
     try:
         hs = sorted((os.path.join(hd, n) for n in os.listdir(hd)

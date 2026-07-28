@@ -31,12 +31,10 @@ def main():
     root = ss.state_root(cwd)
     if not root:
         return
-    top = ss.repo_top(cwd)
-    if not top:
-        return
-    rel = os.path.relpath(os.path.abspath(path), top)
+    base = ss.repo_top(cwd) or cwd  # 비-git 은 프로젝트 루트(cwd) 기준
+    rel = os.path.relpath(os.path.abspath(path), base)
     if rel.startswith(".."):
-        return  # 저장소 밖 파일은 추적하지 않음
+        return  # 프로젝트 밖 파일은 추적하지 않음
     sid = data.get("session_id") or "unknown"
     try:
         os.makedirs(ss.active_dir(root), exist_ok=True)
