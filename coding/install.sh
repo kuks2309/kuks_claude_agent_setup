@@ -5,7 +5,7 @@
 #   도메인: ros2-coding embedded-coding numeric-coding concurrency-coding memory-coding
 #
 # 동작:
-#   1) 코어(coding.md·conventions.md·stack.md) + checks/ → docs/claude_guideline/coding/
+#   1) 코어(coding.md·conventions.md·stack.md·adr-template.md) + checks/ → docs/claude_guideline/coding/
 #   2) 선택 도메인(domains/<d>.md) 복사 (--all 이면 전부)
 #   3) .pre-commit / ci 템플릿 복사(.sample, 덮어쓰기 금지)
 #   4) 타깃 .gitignore 에 .omc/ 추가 (OMC creep 차단)
@@ -66,7 +66,7 @@ record_install() {
 # 설치본 ↔ 저장소 내용 대조 쌍(원본<TAB>설치본). 번들별로 복사 대상과 일치시켜 유지.
 drift_pairs() {
   local f d c
-  for f in coding.md conventions.md stack.md; do
+  for f in coding.md conventions.md stack.md adr-template.md; do
     printf '%s\t%s\n' "$SRC/$f" "$DEST/$f"
   done
   for c in "$SRC/checks/"*.sh; do
@@ -163,10 +163,10 @@ status_check() {
 mkdir -p "$DEST/domains" "$DEST/checks"
 
 # 1) 코어 + 이빨
-for f in coding.md conventions.md stack.md; do cp "$SRC/$f" "$DEST/$f"; done
+for f in coding.md conventions.md stack.md adr-template.md; do cp "$SRC/$f" "$DEST/$f"; done
 cp "$SRC"/checks/*.sh "$DEST/checks/"
 chmod +x "$DEST"/checks/*.sh
-echo "✓ 코어 3 + 이빨 $(ls "$SRC"/checks/*.sh 2>/dev/null | wc -l | tr -d ' ') 복사 → docs/claude_guideline/$BUNDLE/"
+echo "✓ 코어 3 + ADR 템플릿 + 이빨 $(ls "$SRC"/checks/*.sh 2>/dev/null | wc -l | tr -d ' ') 복사 → docs/claude_guideline/$BUNDLE/"
 
 # 2) 도메인 (선택 또는 --all)
 AVAIL=$(cd "$SRC/domains" && ls ./*.md 2>/dev/null | sed 's|\./||;s/\.md$//' | tr '\n' ' ')
