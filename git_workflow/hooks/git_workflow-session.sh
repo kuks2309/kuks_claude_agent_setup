@@ -34,6 +34,36 @@ merge_base_ref(){
   fi
 }
 
+# 훅·규칙 상속 — 새 worktree 에 공유 트리(main worktree)의 설치본을 링크한다.
+#
+# 왜 필요한가: worktree 는 git 이 '추적하는 파일'만 체크아웃한다. 가이드라인 설치본
+# (docs/claude_guideline/**)과 훅 등록(.claude/settings.json)은 대개 미추적·gitignore
+# 대상이라 새 트리에 따라오지 않는다 → 세션 격리를 강제해야 할 바로 그 작업 공간에서
+# 훅이 조용히 무동작(no-op)이 된다. 실물 복사 대신 링크라 공유 트리 갱신이 즉시 반영된다.
+# 추적본은 절대 덮지 않는다(브랜치가 일부 번들을 커밋해 둔 경우 그 파일이 정본).
+link_shared_assets(){
+  local repo="$1" wt="$2" src dst b name
+  # 1) 훅 등록: 디렉토리는 실물로 두고 파일만 링크 — .gitignore 의 `.claude/` 패턴이 계속 먹도록.
+  if [ -f "$repo/.claude/settings.json" ]; then
+    mkdir -p "$wt/.claude"
+    [ -e "$wt/.claude/settings.json" ] || \
+      ln -s "$repo/.claude/settings.json" "$wt/.claude/settings.json"
+  fi
+  # 2) 규칙·훅 본체
+  src="$repo/docs/claude_guideline"; dst="$wt/docs/claude_guideline"
+  [ -d "$src" ] || return 0
+  if [ ! -e "$dst" ]; then
+    mkdir -p "$wt/docs"
+    ln -s "$src" "$dst"
+  else
+    for b in "$src"/*/; do            # 일부 번들이 추적 중 → 없는 번들만 개별 링크
+      [ -d "$b" ] || continue
+      name="$(basename "$b")"
+      [ -e "$dst/$name" ] || ln -s "${b%/}" "$dst/$name"
+    done
+  fi
+}
+
 # 이 브랜치를 체크아웃한 worktree 경로 (없으면 빈 문자열)
 worktree_of_branch(){
   git -C "$1" worktree list --porcelain | awk -v b="refs/heads/$2" '
@@ -53,6 +83,7 @@ cmd_start(){
   fi
   local base; base="$(merge_base_ref "$repo")"
   git -C "$repo" worktree add "$wt" -b "$branch" "$base" -q
+  link_shared_assets "$repo" "$wt"
   say "worktree 생성: $wt (branch $branch, base $base)"
   say "→ 이 폴더에서 작업하세요. 종료 시 'end $short' 로 main 병합·정리."
   echo "$wt"

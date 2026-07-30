@@ -62,5 +62,35 @@ git -C "$ROOT/repo" show-ref --verify --quiet refs/heads/session/SESB && ok bran
 git -C "$ROOT/repo" fetch -q origin
 [ "$(git -C "$ROOT/repo" show origin/main:file.txt)" = "main버전" ] && ok main_uncorrupted || no main_uncorrupted "main 오염"
 
+echo "== start (훅·규칙 상속 링크) =="
+setup
+# 공유 트리에만 있는 미추적 설치본 — worktree 는 이것을 체크아웃하지 못한다.
+mkdir -p "$ROOT/repo/.claude" "$ROOT/repo/docs/claude_guideline/session_workflow"
+echo '{}' > "$ROOT/repo/.claude/settings.json"
+echo rule > "$ROOT/repo/docs/claude_guideline/session_workflow/session_workflow.md"
+run start SESC >/dev/null 2>&1
+WTC="$ROOT/repo-ses-SESC"
+[ -L "$WTC/.claude/settings.json" ] && ok link_settings || no link_settings "settings.json 링크 없음"
+[ -f "$WTC/docs/claude_guideline/session_workflow/session_workflow.md" ] \
+  && ok link_rule_reachable || no link_rule_reachable "링크 경유로 규칙 파일 도달 불가"
+[ -L "$WTC/docs/claude_guideline/session_workflow" ] \
+  && ok link_missing_bundle || no link_missing_bundle "미추적 번들이 링크되지 않음"
+# 브랜치가 추적 중인 번들(git_workflow)은 실디렉터리로 보존 — 링크로 덮으면 안 됨
+{ [ ! -L "$WTC/docs/claude_guideline/git_workflow" ] && \
+  [ -f "$WTC/docs/claude_guideline/git_workflow/git_workflow.md" ]; } \
+  && ok tracked_preserved || no tracked_preserved "추적본이 링크로 대체됨"
+
+echo "== start (설치본이 전부 미추적일 때 = 디렉터리 통째 링크) =="
+git -C "$ROOT/repo" rm -rq docs/claude_guideline
+git -C "$ROOT/repo" commit -q -m "drop tracked guideline"
+git -C "$ROOT/repo" push -q origin main
+mkdir -p "$ROOT/repo/docs/claude_guideline/session_workflow"
+echo rule > "$ROOT/repo/docs/claude_guideline/session_workflow/session_workflow.md"
+run start SESD >/dev/null 2>&1
+WTD="$ROOT/repo-ses-SESD"
+[ -L "$WTD/docs/claude_guideline" ] && ok link_whole_dir || no link_whole_dir "디렉터리 통째 링크 실패"
+[ -f "$WTD/docs/claude_guideline/session_workflow/session_workflow.md" ] \
+  && ok link_whole_reachable || no link_whole_reachable "링크 경유 도달 불가"
+
 echo "-- 결과: PASS=$PASS FAIL=$FAIL --"
 [ "$FAIL" = 0 ]

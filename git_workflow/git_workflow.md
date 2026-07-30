@@ -70,7 +70,8 @@ push·리뷰 방식이 모드에 갈리므로 **작업 전 먼저 판정**한다
 - **작업 흐름 (도구: `hooks/git_workflow-session.sh`, ⟦CI⟧ 자동화)** —
   1. **시작**: `bash <…>/hooks/git_workflow-session.sh start <session_id>` → `origin/main` 기준 `../<repo>-ses-<id>` 링크드 worktree + `session/<id>` 브랜치 생성(공유 HEAD 불변). 출력된 그 폴더에서 작업·커밋한다(§1 규칙: 명시 staging·`type(scope): subject`+`Co-Authored-By`).
   2. **종료(자동)**: SessionEnd 훅 `git_workflow-session-end.py` 가 자동으로 `session/<id>` 를 `main` 에 **안전 병합**(임시 worktree 에서 `origin/main` 최신 위로 병합, `merge.lock` **flock 직렬화** → 동시 종료도 경쟁 없음)하고 `origin`+`fito` 둘 다 push 후 **worktree·브랜치(로컬+원격) 정리**한다. 수동 실행: `git_workflow-session.sh end <session_id>`.
-  3. **충돌·발산 시**: 자동 병합을 **보류**(exit 3) — 브랜치·worktree 보존하고 사용자가 `git merge --no-ff session/<id>` 로 수동 해결. Claude 는 충돌을 자동 해결하지 않는다.
+  3. **충돌·발산 시**: 자동 병합을 **보류**(exit 3) — 브랜치·worktree 보존하고 사용자가 `git merge --no-ff session/<id>` 로 수동 해결. Claude 는 충돌을 자동 해결하지 않는다. 보류된 브랜치는 방치될수록 기준이 전진해 충돌이 커지므로, session_workflow 번들을 함께 쓰면 시작 주입이 **미회수 브랜치**(2일 이상)를 매번 노출한다.
+- **훅·규칙 상속(worktree)** — `start` 는 worktree 생성 직후 공유 트리의 `.claude/settings.json` 과 `docs/claude_guideline` 을 **심볼릭 링크**한다(`link_shared_assets`). worktree 는 git 추적 파일만 체크아웃하는데 설치본은 대개 미추적·gitignore 대상이라, 링크가 없으면 **세션 격리를 강제해야 할 그 트리에서 훅이 조용히 무동작**이 된다. 브랜치가 일부 번들을 추적 중이면 그 추적본은 덮지 않고 없는 번들만 링크한다.
 - **team 과의 구분** — 본 절차는 §3 team 의 PR·리뷰 승인 게이트를 도입하지 **않는다**. 브랜치 목적은 협업 리뷰가 아니라 **세션 이력 격리·동시 push 경쟁 방지**뿐. 병합은 훅이 무충돌일 때만 자동 수행(리뷰 게이트 아님), 충돌 시 사용자 몫.
 
 ## 3. team 모드 (여럿)
