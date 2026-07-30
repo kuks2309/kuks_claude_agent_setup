@@ -14,6 +14,7 @@ import session_state as ss  # noqa: E402
 
 HANDOFF_SHOW = 5
 TOUCHED_SHOW = 10
+BRANCH_SHOW = 5
 
 
 def gc_handoffs(root):
@@ -75,6 +76,18 @@ def main():
         lines.append(f"⚠ 공유 트리가 원격(origin) 대비 {behind}커밋 낡음(stale) — "
                      "광역 수정·재배치·삭제 작업 전에 최신화(pull) 또는 세션 worktree "
                      "사용을 사용자와 1줄 확인하세요.")
+
+    branches = ss.unmerged_session_branches(cwd)
+    if branches:
+        total = sum(a for _, _, a in branches)
+        lines.append(
+            f"⚠ 미회수 세션 브랜치 {len(branches)}개 (미반영 {total}커밋) — 종료 시 자동 병합이 "
+            "충돌로 보류된 브랜치는 방치할수록 기준(main)이 전진해 다음 병합 충돌이 커집니다. "
+            "회수(병합) 여부를 사용자와 확인하세요:")
+        for b, days, ahead in branches[:BRANCH_SHOW]:
+            lines.append(f"- {b} · {days}일 방치 · 미반영 {ahead}커밋")
+        if len(branches) > BRANCH_SHOW:
+            lines.append(f"- …외 {len(branches) - BRANCH_SHOW}개")
 
     hd = ss.handoff_dir(root)
     try:

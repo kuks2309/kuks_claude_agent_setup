@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """session_workflow 상태 공유 로직 — 경로·레지스트리·handoff 형식 helper.
 
-4개 훅(start·gate·track·end)이 동일 상태 형식을 쓰도록 한 곳에 둔다(DRY).
+5개 훅(start·gate·track·write-guard·end)이 동일 상태 형식을 쓰도록 한 곳에 둔다(DRY).
 표준 라이브러리만 사용(self-contained). 상태는 .git 내부(항상 비커밋)의
 session_workflow/ 아래: active/<sid>.json · active/<sid>.touched · handoff/<sid>.md.
 각 세션은 자기 이름 파일에만 쓴다(공유 rewrite 없음 → 잠금 불요).
@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 KST = timezone(timedelta(hours=9))
 STALE_HOURS = 24          # last_seen 이보다 오래되면 잔류 의심
 HANDOFF_KEEP_DAYS = 14    # handoff 자동 정리 기한
+BRANCH_STALE_DAYS = 1     # 미머지 session/* 브랜치를 '방치'로 볼 기준(마지막 커밋 경과일)
 PURPOSE_RE = re.compile(r"^\s*(?:목적|purpose)\s*[::]\s*(.+)$",
                         re.IGNORECASE | re.DOTALL)
 
@@ -174,6 +175,58 @@ def behind_origin_main(cwd, do_fetch=True):
         except (OSError, subprocess.SubprocessError, ValueError):
             pass
     return None
+
+
+def unmerged_session_branches(cwd, min_days=BRANCH_STALE_DAYS):
+    """회수되지 않은 session/* 브랜치 → [(브랜치, 방치일, 미반영 커밋수)].
+
+    기준(base)은 origin/main, 없으면 로컬 main. base 에 이미 다 들어간 브랜치
+    (미반영 0)는 제외하고, 마지막 커밋이 min_days 일 이상 지난 것만 남긴다.
+    미반영 커밋이 많은 순 정렬.
+
+    존재 이유: 세션 종료 자동 병합은 충돌 시 '보류'(브랜치 보존)로 끝나는데,
+    보류된 브랜치를 다시 보라고 알리는 주체가 없으면 그 사이 base 가 전진해
+    다음 병합의 충돌이 더 커진다(보류→방치→발산 되먹임). 시작 주입에서
+    회수 대상을 눈에 보이게 해 이 되먹임을 끊는다.
+    """
+    def git(*args):
+        try:
+            r = subprocess.run(["git", "-C", cwd] + list(args),
+                               capture_output=True, text=True, timeout=5)
+            return r.stdout if r.returncode == 0 else None
+        except (OSError, subprocess.SubprocessError):
+            return None
+
+    base = None
+    for ref, name in (("refs/remotes/origin/main", "origin/main"),
+                      ("refs/heads/main", "main")):
+        if git("show-ref", "--verify", "--quiet", ref) is not None:
+            base = name
+            break
+    if base is None:
+        return []
+    listing = git("for-each-ref", "--format=%(refname:short)\t%(committerdate:unix)",
+                  "refs/heads/session")
+    if not listing:
+        return []
+
+    now = kst_now().timestamp()
+    out = []
+    for line in listing.splitlines():
+        parts = line.split("\t")
+        if len(parts) != 2:
+            continue
+        branch, ts = parts[0], parts[1]
+        count = git("rev-list", "--count", base + ".." + branch)
+        try:
+            ahead = int((count or "0").strip())
+            days = int((now - float(ts)) // 86400)
+        except ValueError:
+            continue
+        if ahead > 0 and days >= min_days:
+            out.append((branch, days, ahead))
+    out.sort(key=lambda t: (-t[2], -t[1]))
+    return out
 
 
 def one_line(text, limit=120):

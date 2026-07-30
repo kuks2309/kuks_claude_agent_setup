@@ -6,9 +6,9 @@
 #        ./install.sh <타깃-프로젝트-루트> --status   # 설치본 낡음 점검(설치 안 함)
 #
 # 동작:
-#   1) session_workflow.md + 훅 5개를 <타깃>/docs/claude_guideline/session_workflow/ 로 복사
+#   1) session_workflow.md + 훅 6개를 <타깃>/docs/claude_guideline/session_workflow/ 로 복사
 #   2) claude.snippet.md 를 <타깃>/CLAUDE.md 에 append (마커 중복 스킵)
-#   3) .claude/settings.json 에 SessionStart·UserPromptSubmit·PostToolUse·SessionEnd 훅 멱등 등록
+#   3) .claude/settings.json 에 SessionStart·UserPromptSubmit·PreToolUse·PostToolUse·SessionEnd 훅 멱등 등록
 #   4) 설치 성공 시 <타깃>/docs/claude_guideline/INSTALLED.md 에 자기 행 기록(커밋·날짜·인자)
 #   상태는 .git/session_workflow/ (비커밋) — .gitignore 불요.
 #   설치 산출물: 규칙(session_workflow.md)·훅. install.sh·claude.snippet.md 는 복사하지 않는다.
@@ -73,7 +73,8 @@ drift_pairs() {
   done
   local hf
   for hf in session_state.py session_workflow-start.py session_workflow-gate.py \
-            session_workflow-track.py session_workflow-end.py; do
+            session_workflow-track.py session_workflow-write-guard.py \
+            session_workflow-end.py; do
     printf '%s\t%s\n' "$SRC/hooks/$hf" "$DEST/hooks/$hf"
   done
 }
@@ -168,7 +169,8 @@ fi
 # 3) 훅 복사
 mkdir -p "$DEST/hooks"
 for hf in session_state.py session_workflow-start.py session_workflow-gate.py \
-          session_workflow-track.py session_workflow-end.py; do
+          session_workflow-track.py session_workflow-write-guard.py \
+          session_workflow-end.py; do
   cp "$SRC/hooks/$hf" "$DEST/hooks/$hf"
   chmod +x "$DEST/hooks/$hf" 2>/dev/null || true
 done
@@ -190,9 +192,10 @@ else
     "$PYBIN \"$H/session_workflow-start.py\"" \
     "$PYBIN \"$H/session_workflow-gate.py\"" \
     "$PYBIN \"$H/session_workflow-track.py\"" \
-    "$PYBIN \"$H/session_workflow-end.py\"" <<'PYEOF'
+    "$PYBIN \"$H/session_workflow-end.py\"" \
+    "$PYBIN \"$H/session_workflow-write-guard.py\"" <<'PYEOF'
 import json, sys
-settings_path, start, gate, track, end = sys.argv[1:6]
+settings_path, start, gate, track, end, guard = sys.argv[1:7]
 try:
     with open(settings_path, encoding="utf-8") as f:
         cfg = json.load(f)
@@ -233,10 +236,11 @@ a = ensure("SessionStart", start, 10)
 b = ensure("UserPromptSubmit", gate, 5)
 c = ensure("PostToolUse", track, 5, matcher="Write|Edit|MultiEdit|NotebookEdit")
 d = ensure_end_before_merge(end, 10)
+e = ensure("PreToolUse", guard, 5, matcher="Write")
 with open(settings_path, "w", encoding="utf-8") as f:
     json.dump(cfg, f, ensure_ascii=False, indent=2)
 print(f"✓ settings.json 훅 등록: SessionStart={a}, UserPromptSubmit={b}, "
-      f"PostToolUse={c}, SessionEnd={d}")
+      f"PostToolUse={c}, SessionEnd={d}, PreToolUse={e}")
 PYEOF
 fi
 

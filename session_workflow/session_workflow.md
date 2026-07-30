@@ -12,7 +12,7 @@
 cd session_workflow && ./install.sh <타깃-프로젝트-루트>
 ```
 
-스크립트가 (1) `session_workflow.md` 와 훅 5개(`session_state.py`·start·gate·track·end)를 `docs/claude_guideline/session_workflow/` 아래로 복사, (2) 등록 스니펫(`claude.snippet.md`)을 타깃 `CLAUDE.md` 에 append, (3) `.claude/settings.json` 에 SessionStart·UserPromptSubmit·PostToolUse·SessionEnd 훅을 멱등 등록한다.
+스크립트가 (1) `session_workflow.md` 와 훅 6개(`session_state.py`·start·gate·track·write-guard·end)를 `docs/claude_guideline/session_workflow/` 아래로 복사, (2) 등록 스니펫(`claude.snippet.md`)을 타깃 `CLAUDE.md` 에 append, (3) `.claude/settings.json` 에 SessionStart·UserPromptSubmit·PreToolUse·PostToolUse·SessionEnd 훅을 멱등 등록한다.
 
 **활성화 게이트**: 본 파일이 `docs/claude_guideline/session_workflow/session_workflow.md` 경로에 없으면 본 룰과 모든 훅은 비활성(no-op).
 
@@ -30,7 +30,8 @@ cd session_workflow && ./install.sh <타깃-프로젝트-루트>
 
 ## 1. 시작 — 목적 선언 게이트
 
-- SessionStart 훅이 세션을 레지스트리에 등록하고 ① 다른 활성 세션(목적·최근 활동·잔류 의심) ② 공유 트리 낡음(stale) 경고(origin/main 대비 N커밋 뒤 — 광역·재배치 작업 전 최신화 또는 세션 worktree 확인) ③ 대기 handoff ④ 목적 게이트 예고를 주입한다.
+- SessionStart 훅이 세션을 레지스트리에 등록하고 ① 다른 활성 세션(목적·최근 활동·잔류 의심) ② 공유 트리 낡음(stale) 경고(origin/main 대비 N커밋 뒤 — 광역·재배치 작업 전 최신화 또는 세션 worktree 확인) ③ **미회수 세션 브랜치**(`session/*` 중 기준 브랜치에 미반영이며 2일 이상 방치 — 브랜치·방치일·미반영 커밋수) ④ 대기 handoff ⑤ 목적 게이트 예고를 주입한다.
+- ③이 필요한 이유: 종료 시 자동 병합은 충돌하면 **보류**(브랜치 보존)로 끝나는데, 회수를 촉구할 주체가 없으면 그 사이 기준 브랜치가 전진해 **다음 병합의 충돌이 더 커진다**(보류→방치→발산 되먹임). 시작 주입이 회수 대상을 매번 노출해 이 고리를 끊는다.
 - **모델**: 목적 미등록 상태에서는 실질 작업 전에 사용자에게 세션 목적 1줄을 요청하고 `목적: …` 형식 입력을 안내한다. 훅이 매 프롬프트 이 지시를 반복 주입한다(누락 불가).
 - **사용자**: `목적: <이 세션이 할 일 1줄>` 로 입력 → 훅이 verbatim 등록·게이트 해제. 재선언은 덮어쓰기(목적 변경 허용). 단발 질문 세션은 `목적: 단발 질문` 으로 충분.
 - 등록된 목적은 충돌 경보·handoff·세션 산출 문서 제목(worklog 등 프로젝트 관례)의 기준이 된다. **목적에 비밀정보를 쓰지 않는다**(verbatim 저장 — 마스킹 불가).
@@ -42,6 +43,19 @@ cd session_workflow && ./install.sh <타깃-프로젝트-루트>
 - 두 활성 세션의 수정 파일이 겹치면 **신규 교집합에 한해 1회** 경보가 주입된다: "파일 X 는 세션 Y(목적: Z)도 수정 중".
 - **모델**: 경보 수신 시 진행을 멈추고 사용자에게 계속/중단/범위 조정을 1줄 확인한 후 진행한다. 경보는 권고(차단 아님) — staging/commit 강제는 본 번들 소관이 아니다.
 - 원칙: **이 세션 산출물만 수정**한다. 타 세션이 만지는 파일이 꼭 필요하면 사용자 확인 후 진행.
+
+### 2-1. 쓰기 직전 가드 (write-guard · add/add 예방)
+
+PreToolUse(`Write`) 훅이 **새 파일을 쓰기 직전**에 두 가지만 본다. 해당하면 `permissionDecision=ask` 로 사용자 확인을 요구한다(차단 아님).
+
+| 판정 | 의미 |
+| --- | --- |
+| (a) 그 경로에 파일이 **이미 있고 git 미추적**이며 이 세션 소유가 아님 | 다른 세션이 방금 만든 산출물일 수 있음 — 덮어쓰면 그 작업이 사라지고, 각자 커밋되면 **add/add 충돌** |
+| (b) 그 경로가 **다른 활성 세션의 touched** 에 있음 | 동시 작업 중 |
+
+- §2 의 사후 경보(track→gate)가 못 잡는 두 경우를 메운다: **쓰기 이전 시점**이라는 점, 그리고 (a)는 파일시스템·git 만 보므로 **상대가 Bash 로 만들었거나 이미 종료한 세션이어도** 잡힌다는 점.
+- **모델**: ask 를 받으면 먼저 그 파일을 Read 해 남의 산출물인지 확인하고, 계속 여부를 사용자에게 1줄 확인한다. 무조건 재작성하지 않는다.
+- 추적 중인 파일 덮어쓰기는 통과시킨다 — git 이 3-way 병합으로 처리할 수 있어 add/add 가 아니다.
 
 ## 3. 종료 — 2단 방어
 
@@ -67,8 +81,10 @@ cd session_workflow && ./install.sh <타깃-프로젝트-루트>
 ## 5. 한계 (정직)
 
 - **비정상 종료**(탭 강제 종료 등)는 SessionEnd 미발화 가능 → active 잔류. 다음 세션 시작 주입이 "잔류 의심"으로 표시하고 touched 를 노출하므로 수동 회수한다(자동 handoff 승격은 살아있는 세션 오판 위험으로 하지 않음).
-- **Bash 로만 생성한 파일은 미추적**(도구 matcher 한계) → 충돌 경보·handoff 대상에서 빠질 수 있다.
+- **Bash 로만 생성한 파일은 미추적**(도구 matcher 한계) → 충돌 경보·handoff 대상에서 빠질 수 있다. write-guard 판정 (a)는 파일시스템을 보므로 *남이 Bash 로 만든 파일*은 잡지만, *내가 Bash 로 만드는 것*은 PreToolUse(Write)를 거치지 않아 여전히 대상 밖이다.
 - 충돌 감지는 **파일 단위**(라인 단위 아님).
+- **write-guard 는 확인(ask)이지 차단(deny)이 아니다** — 사용자가 승인하면 그대로 쓴다. 또 신규 경로(파일이 없고 아무도 안 만진 경로)는 통과하므로, 두 세션이 **동시에** 같은 새 경로를 처음 만드는 순간까지 막지는 못한다(둘 중 나중 쪽이 잡힌다).
+- **미회수 브랜치 경고는 `session/*` 이름 규약에 의존** — 다른 이름으로 만든 브랜치는 보이지 않는다. 기준은 `origin/main`, 없으면 로컬 `main`.
 - 목적·handoff 는 verbatim 저장 — 비밀정보 의미 마스킹 불가.
 - python3 부재 시 훅 미동작 — 본 규칙 텍스트(절차)만 생존한다.
 - **worktree 자동 정리 플로우 병용 시**: handoff 는 목록만 박제(내용 백업 아님). 자동 병합 도구가 미커밋 상태의 세션 worktree 를 강제 제거하면 파일 내용은 유실된다 — 종료 전 커밋 확인(§3 1단)이 유일한 내용 보존 수단.
@@ -86,3 +102,5 @@ cd session_workflow && ./install.sh <타깃-프로젝트-루트>
 5. 상태 저장소(`.git/session_workflow/`)는 훅 소관 — 모델 수동 편집 금지(handoff 삭제 예외).
 6. 종료·커밋 보고는 **이 세션 작업만** — 타 세션·공유 트리 상태는 사용자 결정이 필요한 경보 1줄로 제한.
 7. 시작 주입에 공유 트리 낡음(stale) 경고가 있으면, 광역·재배치 작업 전에 최신화 여부를 사용자와 확인.
+8. 시작 주입에 미회수 세션 브랜치가 있으면 회수(병합) 여부를 사용자와 확인 — 방치할수록 충돌이 커진다.
+9. write-guard 의 ask 를 받으면 그 파일을 먼저 Read 해 남의 산출물인지 확인한 뒤 사용자에게 계속 여부를 확인한다.
