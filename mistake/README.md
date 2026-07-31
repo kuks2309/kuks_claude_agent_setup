@@ -36,8 +36,8 @@ PY
 
 ## 강제 모델 — 정직 선언
 
-- **SessionStart 훅**(`hooks/mistake-inject.py`) = 세션 시작 시 `docs/claude-mistake/INDEX.md` §메타 패턴·§미해결 항목 + open entry 목록을 주입 — 과거 실패를 세션 초기 컨텍스트로 승격해 동일 실수 재발과 open entry 방치를 차단. 기록이 없으면 침묵(no-op).
-- **entry-lint 이빨**(`checks/entry-lint.sh`) = 형식·closure 규칙(단일 frontmatter·id/파일명·type↔category 정합·owner 규칙·TBD(To Be Determined) 금지·5 절 순서·open 7 일 시한) 기계 검출. pre-commit·CI(Continuous Integration) 에 연결하면 커밋 게이트로 승격 가능.
+- **SessionStart 훅**(`hooks/mistake-inject.py`) = 세션 시작 시 `docs/claude-mistake/INDEX.md` §메타 패턴·§미해결 항목 + open entry·청소 미완 retracted entry 목록을 주입 — 과거 실패를 세션 초기 컨텍스트로 승격해 동일 실수 재발과 미해결 방치를 차단. retracted(기각) entry 는 학습 자료로 주입하지 않는다 (오판 오염 증폭 방지). 기록이 없으면 침묵(no-op).
+- **entry-lint 이빨**(`checks/entry-lint.sh`) = 형식·closure 규칙(단일 frontmatter·id/파일명·type↔category 정합·owner 규칙·TBD(To Be Determined) 금지·5 절 순서·open 7 일 시한·retracted 기각 각주/오염 목록/청소 시한) 기계 검출. pre-commit·CI(Continuous Integration) 에 연결하면 커밋 게이트로 승격 가능.
 - **한계(정직)** — 사건 발생 시 entry 를 *작성하는 행위 자체*는 자기보고 의존 **advisory** (CLAUDE.md 스니펫 + 세션 주입으로 상기할 뿐 강제 불가). entry-lint 는 "작성된 기록의 형식"만 강제하며 "기록 누락"은 검출하지 못한다. python 없는 환경에선 훅·이빨 모두 생략 — 규칙 텍스트만 생존한다.
 
 ## 자체 점검

@@ -7,7 +7,9 @@
 #
 # 검출: 단일 frontmatter / id 형식·파일명 일치 / type·category 정합 / status 값 /
 #       closed+owner 금지·open+owner 필수 / closed 인데 reflected_assets 공백 /
-#       TBD(To Be Determined) 류 문구 / 고정 5 절 존재·순서 / open 7 일 초과
+#       TBD(To Be Determined) 류 문구 / 고정 5 절 존재·순서 / open 7 일 초과 /
+#       retracted 형식 (기각 각주·오염 목록 존재, 청소 미완 7 일 초과,
+#       청소 완료 주장인데 미처리 문구 잔존)
 
 set -euo pipefail
 
@@ -72,13 +74,27 @@ for f in sorted(DIR.glob("*.md")):
     else:
         errs.append("type 값 위반: %s" % t)
     status = fields.get("status")
-    if status not in ("open", "closed"):
+    if status not in ("open", "closed", "retracted"):
         errs.append("status 값 위반: %s" % status)
     has_owner = "**owner**:" in text
     if status == "closed" and has_owner:
         errs.append("closed 인데 owner 줄 부착")
     if status == "open" and not has_owner:
         errs.append("open 인데 owner 줄 없음")
+    if status == "retracted":
+        m_ret = re.search(r"(?m)^>\s*\*\*기각\*\*:\s*(\d{4}-\d{2}-\d{2})", text)
+        if not m_ret:
+            errs.append("retracted 인데 기각 각주 (> **기각**: YYYY-MM-DD — …) 없음")
+        if "| 오염 자산 |" not in text:
+            errs.append("retracted 인데 오염 목록 표 없음")
+        sweep_pending = re.search(r"(?m)^\|.*(TBD|추후|후보|미처리).*\|\s*$", text)
+        if has_owner:
+            if m_ret:
+                age = (TODAY - datetime.date.fromisoformat(m_ret.group(1))).days
+                if age > 7:
+                    errs.append("retracted 청소 미완 %d일 경과 (7일 시한 초과 — 오염 청소 의무)" % age)
+        elif sweep_pending:
+            errs.append("청소 완료 주장 (owner 없음) 인데 오염 목록에 TBD/추후/후보/미처리 잔존")
     has_assets = bool(re.search(r"reflected_assets:\s*\n\s*-\s*\S", fm))
     if status == "closed" and not has_assets:
         errs.append("closed 인데 reflected_assets 비어 있음")
