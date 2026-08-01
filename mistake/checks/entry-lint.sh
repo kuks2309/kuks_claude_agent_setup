@@ -49,7 +49,7 @@ ROOT = DIR.resolve().parent.parent  # docs/claude-mistake → 프로젝트 루�
 
 def asset_path(tok):
     """reflected_assets 항목 첫 토큰 → 검사 가능 경로 (경로 아니면 None)."""
-    tok = tok.strip("`").split("#")[0]
+    tok = tok.strip("`\"'").split("#")[0]
     tok = re.sub(r":L?\d[\dL\-]*$", "", tok)
     if not tok:
         return None
