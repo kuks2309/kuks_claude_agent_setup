@@ -39,7 +39,7 @@ import sys
 DIR = pathlib.Path(sys.argv[1])
 MISTAKE_CATS = {"manual-misread", "wrong-assumption", "context-missing", "intent-guess"}
 VIOLATION_CATS = {"user-intent-only", "per-file-approval", "iteration-loop",
-                  "tech-debt-shortcut", "verify-skip", "scope-creep"}
+                  "tech-debt-shortcut", "verify-skip", "scope-creep", "record-skip"}
 SECTIONS = ["## 무엇을 했는가", "## 무엇이 잘못이었나", "## 사용자 지적",
             "## 원인 분석", "## 재발 방지"]
 NAME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-\d{3}(_[^/]+)?\.md$")

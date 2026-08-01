@@ -80,7 +80,7 @@ Claude 가 시도한 행동 / 작성한 내용을 객관적으로 기술.
 | `status` | 예 | `open` (closure 미충족) / `closed` (충족) / `retracted` (판정 기각 — §기각·오염 청소 절차) |
 | `reflected_assets` | 예 | 재발 방지가 반영된 자산 링크 배열. open 시 빈 배열 가능하나 closure 시 1+ 필수 |
 
-**category ↔ type 정합 규칙**: mistake 계열 4 종은 `type: mistake` 에서만, rule-violation 계열 6 종은 `type: rule-violation` 에서만 유효하다. 불일치 entry 는 형식 위반으로 취급한다.
+**category ↔ type 정합 규칙**: mistake 계열 4 종은 `type: mistake` 에서만, rule-violation 계열 7 종은 `type: rule-violation` 에서만 유효하다. 불일치 entry 는 형식 위반으로 취급한다.
 
 **`reflected_assets` 경로 컨벤션**: 프로젝트 root 기준 상대 경로. 가능하면 `파일.md#앵커` 또는 `파일.md:L번호` 까지 명시한다. 예: `docs/claude_guideline/coding.md#impl-pre-confirm`, `docs/claude_guideline/iteration_anti_pattern.md:L21-23`, `.claude/hooks/per_file_approval.sh`.
 
@@ -97,7 +97,7 @@ Claude 가 시도한 행동 / 작성한 내용을 객관적으로 기술.
 - **`intent-guess`** — 모호한 사용자 표현을 질문 없이 추측. 재발 방지는 통상 모호어 사전 질문 규칙 강화. (단, "모호어 사전 질문" 이 본 프로젝트에 명시 규칙으로 설치되어 있으면 §판정 기준의 상대성 에 따라 `rule-violation`/`iteration-loop`.)
   예: "간단히" 라는 표현을 "1 줄" 로 해석할지 "치트시트 형식" 으로 해석할지 묻지 않고 첫 번째로 가정.
 
-### type: rule-violation — 무시된 규칙의 종류 (6 종)
+### type: rule-violation — 무시된 규칙의 종류 (7 종)
 
 - **`user-intent-only`** — "사용자가 지시한 것만 수행" (루트 `CLAUDE.md` 핵심 원칙) 위반. 임의 추가·임의 삭제·요청 외 변경.
   예: 사용자가 함수 하나 수정 요청했는데 같은 파일의 다른 함수도 "스타일 통일" 명목으로 임의 정리.
@@ -111,6 +111,8 @@ Claude 가 시도한 행동 / 작성한 내용을 객관적으로 기술.
   예: 코드 수정 후 빌드·테스트 실행 없이 "수정 완료" 보고.
 - **`scope-creep`** — 사용자 요청 범위를 임의 확장 (요청한 fix 외 리팩토링·정리·관련 없는 변경 동반).
   예: 버그 fix 요청에 무관한 import 정리, 변수명 변경, 주석 추가 동반.
+- **`record-skip`** — 기존 기록 검토 의무 (§기존 기록 검토 시점) 위반. 자기·세션 기록 (code_updates entry·open mistake entry·전날의 주석·보류 결정) 을 읽지 않고 계획 수립·작성에 착수 — "계획 먼저, 근거 나중" 역방향 탐색.
+  예: 전날 자신이 남긴 "보류" 결정 주석을 재독하지 않고 같은 모듈의 재작업 계획을 제시.
 
 새 카테고리 추가가 필요하면 번들 SSOT(Single Source of Truth) 의 enum 리스트를 먼저 갱신한다 (다운스트림 임의 추가 금지 — §변경 절차).
 
@@ -169,6 +171,7 @@ entry 의 판정 **내용 자체** — 원인 분석의 진단, 재발 방지의
 각 entry 는 다음 조건을 모두 만족할 때만 `status: closed` 로 표기한다. 미충족 entry 는 `docs/claude-mistake/INDEX.md` §미해결 항목 표에 등재 (INDEX.md 운용은 선택 사항 — 사건 누적 시 권장).
 
 - **`reflected_assets` 1+ 명시** — 실제로 갱신된 자산의 링크가 1 개 이상. type 별 자산 종류: `mistake` 는 지식 자산 (가이드라인·메모리·매뉴얼 인용), `rule-violation` 은 강제 메커니즘 자산 (강화된 규칙 절·신규 hook·audit 룰·체크리스트). **특히 `rule-violation` 은 기록만으로 closure 불가** — 강제 메커니즘 보강이 핵심.
+- **재발 시 격상 의무 (에스컬레이션 사다리)** — 동일 category (또는 INDEX §메타 패턴의 같은 묶음) 의 재발 entry 는 직전 entry 와 **같은 종류의 `reflected_assets` 로 closure 할 수 없다**. 강제력 사다리 ① 기록 → ② SessionStart 주입 (가시성) → ③ PreToolUse 게이트 (행동 차단) → ④ Stop 게이트 (턴 종결 차단) 에서 직전 자산보다 최소 1 단계 강한 자산이 1+ 필요하다. 재발은 직전 재발 방지의 부족 실증이므로 직전 entry 도 `status: open` 으로 재open 하고 owner 를 부착한다 (본문 말미 재발 각주 1 줄: `> **재발**: YYYY-MM-DD, <새 entry id> — 자산 격상은 새 entry 로 위임`).
 - **TBD(To Be Determined) 금지** — `reflected_assets` 항목이 "TBD", "추후", "후보" 로 끝나면 open 상태. 동일 세션 또는 7 일 이내 closure 의무.
 - **category ↔ type 정합** — frontmatter 가 §Frontmatter 필드 정의 의 정합 규칙을 충족해야 한다.
 - **open 시 owner 명시** — `status: open` entry 는 §항목 형식 의 재발 방지 절 말미에 `**owner**:` 한 줄로 closure 책임자를 명시.
@@ -202,6 +205,7 @@ entry 의 판정 **내용 자체** — 원인 분석의 진단, 재발 방지의
 - **세션 시작 (자동)** — 번들 설치 시 등록되는 SessionStart hook (`hooks/mistake-inject.py`) 이 `docs/claude-mistake/INDEX.md` §메타 패턴 + §미해결 항목 과 open entry·청소 미완 `retracted` entry 목록을 자동 주입한다. hook 미등록 환경은 수동 `head -50 docs/claude-mistake/INDEX.md`.
 - **작업 시작 전 (수동)** — 동일 영역 / 카테고리에서 기존 사건이 있었는지 `docs/claude-mistake/` 폴더를 빠르게 훑는다.
 - **사용자 정정 직후** — 같은 세션의 다음 작업 전 정정한 카테고리의 `## 재발 방지` 절을 재독한다 (재발 방지 미적용 차단).
+- **기록 대조 보고 (검토의 산출물 형식)** — 위 검토의 보고는 3 줄이면 충분하다: ① 읽은 기록 경로 ② 이미 결정된 것 ③ 그에 따른 이번 턴 행동. **"이미 완료됨 / 보류로 결정됨 — 추가 작업 없음" 도 완결된 산출물이다** — 매 턴 새 산출물을 내려는 편향이 기록 확인을 건너뛰게 만드는 실패 (category `record-skip`) 를 본 형식이 차단한다.
 
 ## 자체 점검
 
