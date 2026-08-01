@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """mistake-inject.py — SessionStart 훅: claude-mistake 기록 요약 주입.
 
-docs/claude-mistake/INDEX.md 의 §메타 패턴·§미해결 항목과 open entry 목록을
-세션 시작 컨텍스트로 주입한다. 기록이 없으면 침묵(no-op). 항상 exit 0.
+docs/claude-mistake/INDEX.md 의 §메타 패턴·§미해결 항목과 open entry·
+청소 미완 retracted entry 목록을 세션 시작 컨텍스트로 주입한다.
+retracted(기각) entry 는 학습 자료로 주입하지 않으며, owner 줄이 남은
+청소 미완 건만 미해결 목록에 올린다 (오염 방치 차단 — 규칙: mistake.md
+§기각·오염 청소 절차). 기록이 없으면 침묵(no-op). 항상 exit 0.
 """
 import glob
 import json
@@ -50,8 +53,18 @@ def open_entries(entry_dir):
                 head = f.read(2000)
         except OSError:
             continue
-        if head.startswith("---") and re.search(r"(?m)^status:\s*open\b", head):
+        if not head.startswith("---"):
+            continue
+        if re.search(r"(?m)^status:\s*open\b", head):
             opens.append(name)
+        elif re.search(r"(?m)^status:\s*retracted\b", head):
+            try:
+                with open(path, encoding="utf-8", errors="replace") as f:
+                    full = f.read()
+            except OSError:
+                continue
+            if "**owner**:" in full:
+                opens.append(name + " (기각·청소 미완)")
     return opens
 
 
@@ -65,7 +78,7 @@ def main():
         listed = ", ".join(opens[:MAX_OPEN_LIST])
         extra = " 외 %d건" % (len(opens) - MAX_OPEN_LIST) if len(opens) > MAX_OPEN_LIST else ""
         out.append(
-            "[claude-mistake open entry] %s%s — closure(reflected_assets 반영·7일 시한) 필요. "
+            "[claude-mistake 미해결 entry] %s%s — closure 또는 오염 청소(7일 시한) 필요. "
             "규칙: docs/claude_guideline/mistake/mistake.md" % (listed, extra)
         )
     if out:

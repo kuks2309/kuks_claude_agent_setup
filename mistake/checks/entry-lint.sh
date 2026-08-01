@@ -7,7 +7,11 @@
 #
 # 검출: 단일 frontmatter / id 형식·파일명 일치 / type·category 정합 / status 값 /
 #       closed+owner 금지·open+owner 필수 / closed 인데 reflected_assets 공백 /
-#       TBD(To Be Determined) 류 문구 / 고정 5 절 존재·순서 / open 7 일 초과
+#       TBD(To Be Determined) 류 문구 / 고정 5 절 존재·순서 / open 7 일 초과 /
+#       retracted 형식 (기각 각주·오염 목록 존재, 청소 미완 7 일 초과,
+#       청소 완료 주장인데 미처리 문구 잔존) /
+#       교차 파일 id 중복 / closed 의 reflected_assets 경로 실재 (유령 자산 —
+#       retracted 는 청소로 자산이 정당 삭제될 수 있어 제외)
 
 set -euo pipefail
 
@@ -40,9 +44,27 @@ SECTIONS = ["## 무엇을 했는가", "## 무엇이 잘못이었나", "## 사용
             "## 원인 분석", "## 재발 방지"]
 NAME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-\d{3}(_[^/]+)?\.md$")
 TODAY = datetime.date.today()
+ROOT = DIR.resolve().parent.parent  # docs/claude-mistake → 프로젝트 루트
+
+
+def asset_path(tok):
+    """reflected_assets 항목 첫 토큰 → 검사 가능 경로 (경로 아니면 None)."""
+    tok = tok.strip("`\"'").split("#")[0]
+    tok = re.sub(r":L?\d[\dL\-]*$", "", tok)
+    if not tok:
+        return None
+    if tok.startswith("~"):
+        return pathlib.Path(tok).expanduser()
+    if tok.startswith("/"):
+        return pathlib.Path(tok)
+    if "/" in tok:
+        return ROOT / tok
+    return None  # 파일명 단독 등 — 실재 검사 불가 항목은 통과
+
 
 fails = 0
 checked = 0
+id_map = {}
 for f in sorted(DIR.glob("*.md")):
     if f.name in ("INDEX.md", "README.md"):
         continue
@@ -62,6 +84,8 @@ for f in sorted(DIR.glob("*.md")):
         errs.append("id 형식 위반: %r" % ident)
     elif not f.name.startswith(ident):
         errs.append("파일명이 id 로 시작하지 않음")
+    if ident:
+        id_map.setdefault(ident, []).append(f.name)
     t, c = fields.get("type"), fields.get("category")
     if t == "mistake":
         if c not in MISTAKE_CATS:
@@ -72,18 +96,37 @@ for f in sorted(DIR.glob("*.md")):
     else:
         errs.append("type 값 위반: %s" % t)
     status = fields.get("status")
-    if status not in ("open", "closed"):
+    if status not in ("open", "closed", "retracted"):
         errs.append("status 값 위반: %s" % status)
     has_owner = "**owner**:" in text
     if status == "closed" and has_owner:
         errs.append("closed 인데 owner 줄 부착")
     if status == "open" and not has_owner:
         errs.append("open 인데 owner 줄 없음")
+    if status == "retracted":
+        m_ret = re.search(r"(?m)^>\s*\*\*기각\*\*:\s*(\d{4}-\d{2}-\d{2})", text)
+        if not m_ret:
+            errs.append("retracted 인데 기각 각주 (> **기각**: YYYY-MM-DD — …) 없음")
+        if "| 오염 자산 |" not in text:
+            errs.append("retracted 인데 오염 목록 표 없음")
+        sweep_pending = re.search(r"(?m)^\|.*(TBD|추후|후보|미처리).*\|\s*$", text)
+        if has_owner:
+            if m_ret:
+                age = (TODAY - datetime.date.fromisoformat(m_ret.group(1))).days
+                if age > 7:
+                    errs.append("retracted 청소 미완 %d일 경과 (7일 시한 초과 — 오염 청소 의무)" % age)
+        elif sweep_pending:
+            errs.append("청소 완료 주장 (owner 없음) 인데 오염 목록에 TBD/추후/후보/미처리 잔존")
     has_assets = bool(re.search(r"reflected_assets:\s*\n\s*-\s*\S", fm))
     if status == "closed" and not has_assets:
         errs.append("closed 인데 reflected_assets 비어 있음")
     if re.search(r"(?m)^\s*-\s.*(TBD|추후|후보)\s*\)?\s*$", fm):
         errs.append("reflected_assets 에 TBD/추후/후보")
+    if status == "closed":  # retracted 는 청소로 자산이 정당 삭제될 수 있어 제외
+        for tok in re.findall(r"(?m)^\s*-\s*(\S+)", fm):
+            p = asset_path(tok)
+            if p is not None and not p.exists():
+                errs.append("반영 자산 실재하지 않음 (유령 자산): %s" % tok)
     pos = [text.find(s) for s in SECTIONS]
     if -1 in pos:
         errs.append("고정 5 절 누락: %s" % [s for s, p in zip(SECTIONS, pos) if p < 0])
@@ -100,6 +143,11 @@ for f in sorted(DIR.glob("*.md")):
             print("   - %s" % e)
     else:
         print("[PASS] %s" % f.name)
+
+for ident, names in sorted(id_map.items()):
+    if len(names) > 1:
+        fails += 1
+        print("[FAIL] id 중복: %s — %s" % (ident, ", ".join(names)))
 
 if checked == 0:
     print("검사 대상 entry 0 건 (PASS)")
