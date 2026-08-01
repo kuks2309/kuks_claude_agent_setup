@@ -211,7 +211,7 @@ entry 의 판정 **내용 자체** — 원인 분석의 진단, 재발 방지의
 ./docs/claude_guideline/mistake/checks/entry-lint.sh <entry-폴더>  # 폴더 지정
 ```
 
-검출 항목: 단일 frontmatter / id 형식·파일명 일치 / type·category 정합 / status 값 / closed+owner 금지·open+owner 필수 / closed 인데 `reflected_assets` 공백 / TBD 류 문구 / 고정 5 절 존재·순서 / open 7 일 초과 / retracted 형식 (기각 각주·오염 목록 존재, 미처리 행 잔존 시 owner 필수·7 일 초과).
+검출 항목: 단일 frontmatter / id 형식·파일명 일치 / type·category 정합 / status 값 / closed+owner 금지·open+owner 필수 / closed 인데 `reflected_assets` 공백 / TBD 류 문구 / 고정 5 절 존재·순서 / open 7 일 초과 / retracted 형식 (기각 각주·오염 목록 존재, 미처리 행 잔존 시 owner 필수·7 일 초과) / 교차 파일 id 중복 / closed 의 reflected_assets 경로 실재 (유령 자산 — retracted 는 청소로 자산이 정당 삭제될 수 있어 제외).
 
 ## 변경 절차
 
