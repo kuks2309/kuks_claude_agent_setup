@@ -54,12 +54,15 @@ def main():
         out.append("[SESSION-WORKFLOW] 세션 목적 등록 완료: "
                    + ss.one_line(meta["purpose"]))
     elif not meta.get("purpose"):
-        out.append(
-            "[SESSION-WORKFLOW — 목적 게이트]\n"
-            "본 세션의 목적이 미등록입니다. 실질 작업 전에 사용자에게 세션 목적 1줄을 "
-            "요청하고 `목적: …` 형식으로 입력하도록 안내하세요(입력 시 훅이 자동 등록). "
-            "단발 질문이면 `목적: 단발 질문`으로 충분합니다."
-        )
+        if not meta.get("purpose_prompted"):
+            meta["purpose_prompted"] = True
+            out.append(
+                "[SESSION-WORKFLOW — 목적 게이트]\n"
+                "본 세션의 목적이 미등록입니다. 실질 작업 전에 사용자에게 세션 목적 1줄을 "
+                "요청하고 `목적: …` 형식으로 입력하도록 안내하세요(입력 시 훅이 자동 등록). "
+                "단발 질문이면 `목적: 단발 질문`으로 충분합니다. "
+                "(본 안내는 세션당 1회만 표시 — 이후 미등록이어도 재촉하지 않음)"
+            )
 
     conflicts = conflict_lines(root, sid, meta)
     if conflicts:
