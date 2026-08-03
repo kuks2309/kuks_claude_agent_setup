@@ -12,7 +12,7 @@
 cd session_workflow && ./install.sh <타깃-프로젝트-루트>
 ```
 
-스크립트가 (1) `session_workflow.md` 와 훅 6개(`session_state.py`·start·gate·track·write-guard·end)를 `docs/claude_guideline/session_workflow/` 아래로 복사, (2) 등록 스니펫(`claude.snippet.md`)을 타깃 `CLAUDE.md` 에 append, (3) `.claude/settings.json` 에 SessionStart·UserPromptSubmit·PreToolUse·PostToolUse·SessionEnd 훅을 멱등 등록한다.
+스크립트가 (1) `session_workflow.md` 와 훅 7개(`session_state.py`·start·gate·track·write-guard·state-guard·end)를 `docs/claude_guideline/session_workflow/` 아래로 복사, (2) 등록 스니펫(`claude.snippet.md`)을 타깃 `CLAUDE.md` 에 append, (3) `.claude/settings.json` 에 SessionStart·UserPromptSubmit·PreToolUse(`Write`·`Bash`)·PostToolUse·SessionEnd 훅을 멱등 등록한다.
 
 **활성화 게이트**: 본 파일이 `docs/claude_guideline/session_workflow/session_workflow.md` 경로에 없으면 본 룰과 모든 훅은 비활성(no-op).
 
@@ -57,6 +57,24 @@ PreToolUse(`Write`) 훅이 **새 파일을 쓰기 직전**에 두 가지만 본�
 - **모델**: ask 를 받으면 먼저 그 파일을 Read 해 남의 산출물인지 확인하고, 계속 여부를 사용자에게 1줄 확인한다. 무조건 재작성하지 않는다.
 - 추적 중인 파일 덮어쓰기는 통과시킨다 — git 이 3-way 병합으로 처리할 수 있어 add/add 가 아니다.
 
+### 2-2. 상태 저장소 쓰기 가드 (state-guard · §0 강제)
+
+§0·룰 5 의 「상태 저장소는 훅 소관 — 모델 수동 편집 금지」는 오래도록 **문장으로만** 존재했다. write-guard 는 PreToolUse(`Write`) 에만 걸려 있어 **Bash 로 쓰는 경로가 무방비**였고, 실제로 `python3 -c "... save_session(...)"` 한 줄로 목적 게이트가 우회된 사건이 발생했다. 그 구멍을 메우는 것이 본 훅이다.
+
+PreToolUse(`Bash`) 훅 `hooks/session_workflow-state-guard.py` 가 명령 문자열을 보고 판정한다. 해당하면 `permissionDecision=ask` 로 사용자 확인을 요구한다(차단 아님).
+
+| 단계 | 판정 |
+| --- | --- |
+| 1 | 명령이 상태 저장소를 가리키는가 — 경로 조각(`.git/session_workflow`, `.claude/session_workflow`, `session_workflow/{active,handoff}`) 또는 상태 모듈·변이 API 이름(`session_state`, `save_session`, `ensure_session`) |
+| 2 | 가리킨다면 **명백한 읽기 전용 명령**인가(`cat`·`ls`·`grep`·`find`·`jq` 등 allowlist, 첫 토큰 기준) → 통과 |
+| 3 | **handoff 파일 삭제**인가(§0 유일 예외, 따옴표 경로 포함) → 통과 |
+| 4 | 그 외 → `ask` |
+
+- allowlist 명령이라도 **리다이렉션(`>`/`>>`)이 상태 경로로 향하면** 쓰기로 보고 `ask` 한다.
+- override: 명령에 `# sw:allow-state-write` 주석 또는 env `SW_ALLOW_STATE_WRITE=1`.
+- **모델**: ask 를 받으면 우회하지 말고 **정상 경로로 돌아간다** — 목적 등록은 사용자가 `목적: …` 로 입력해야 훅이 verbatim 등록한다(§1). 모델이 대신 써넣는 것은 그 자체가 §0 위반이다.
+- 회귀 시험: `hooks/tests/test_state_guard.py` (훅을 서브프로세스로 띄워 stdin JSON → stdout 계약 검증, 31 케이스 — 위반 재현·리다이렉션·파이프·heredoc·복합 명령·§0 예외(따옴표 포함)·override·오탐 방지·미설치 무간섭·견고성).
+
 ## 3. 종료 — 2단 방어
 
 **1단 (명시 종료 — 모델 수행)**: 사용자가 "세션 종료" 를 선언하면:
@@ -83,6 +101,7 @@ PreToolUse(`Write`) 훅이 **새 파일을 쓰기 직전**에 두 가지만 본�
 - **비정상 종료**(탭 강제 종료 등)는 SessionEnd 미발화 가능 → active 잔류. 다음 세션 시작 주입이 "잔류 의심"으로 표시하고 touched 를 노출하므로 수동 회수한다(자동 handoff 승격은 살아있는 세션 오판 위험으로 하지 않음).
 - **Bash 로만 생성한 파일은 미추적**(도구 matcher 한계) → 충돌 경보·handoff 대상에서 빠질 수 있다. write-guard 판정 (a)는 파일시스템을 보므로 *남이 Bash 로 만든 파일*은 잡지만, *내가 Bash 로 만드는 것*은 PreToolUse(Write)를 거치지 않아 여전히 대상 밖이다.
 - 충돌 감지는 **파일 단위**(라인 단위 아님).
+- **state-guard 는 셸 파싱 휴리스틱**이다 — `eval`·`xargs`·별칭·변수 확장(`$D/active`)으로 우회 가능하고, `ask` 이지 `deny` 가 아니다. 훅 자신이 상태를 쓰는 경로(정상 동작)는 대상 밖이다(명령에 상태 경로가 나타나지 않음).
 - **write-guard 는 확인(ask)이지 차단(deny)이 아니다** — 사용자가 승인하면 그대로 쓴다. 또 신규 경로(파일이 없고 아무도 안 만진 경로)는 통과하므로, 두 세션이 **동시에** 같은 새 경로를 처음 만드는 순간까지 막지는 못한다(둘 중 나중 쪽이 잡힌다).
 - **미회수 브랜치 경고는 `session/*` 이름 규약에 의존** — 다른 이름으로 만든 브랜치는 보이지 않는다. 기준은 `origin/main`, 없으면 로컬 `main`.
 - 목적·handoff 는 verbatim 저장 — 비밀정보 의미 마스킹 불가.
@@ -104,3 +123,4 @@ PreToolUse(`Write`) 훅이 **새 파일을 쓰기 직전**에 두 가지만 본�
 7. 시작 주입에 공유 트리 낡음(stale) 경고가 있으면, 광역·재배치 작업 전에 최신화 여부를 사용자와 확인.
 8. 시작 주입에 미회수 세션 브랜치가 있으면 회수(병합) 여부를 사용자와 확인 — 방치할수록 충돌이 커진다.
 9. write-guard 의 ask 를 받으면 그 파일을 먼저 Read 해 남의 산출물인지 확인한 뒤 사용자에게 계속 여부를 확인한다.
+10. state-guard 의 ask 를 받으면 우회하지 말고 정상 경로로 돌아간다 — 상태 저장소는 훅 소관이다(룰 5).
