@@ -20,7 +20,8 @@ cd coding && ./install.sh <타깃-프로젝트-루트> [도메인...|--all]
 진짜 인터록은 **코드에서 재도출(re-derive)되는 것뿐**이다. 모든 규칙에 강제 태그를 단다:
 
 - **`⟦CI:<id>⟧`** = `checks/<id>.sh` 가 커밋된 코드로부터 결정론적으로 재도출·차단(pre-commit·CI). **에이전트가 못 속인다.** (현재 `<id>` ∈ {index-fresh, dup-signature, tests-ran, banned-pattern, adr-fields})
-- **`⟦권고⟧`** = 코드 재도출 불가. 에이전트 자기보고에 의존하므로 **정직하게 advisory**. (태그 없는 체크박스는 전부 `⟦권고⟧`.)
+- **`⟦훅:<id>⟧`** = `hooks/coding-<id>.py` 가 **도구 호출 시점에 차단**(Claude Code 훅). 사후 재도출이 아니라 사전 차단이라 **하려던 작업 자체가 막힌다.** 자기보고에 의존하지 않으므로 advisory 가 아니다. 한계는 정직하게: 훅 미설치 환경(설정 미등록·타 에이전트)에서는 강제력 0 이고, 우회 경로(`CODING_GATE_SKIP=1`·`.allow` 파일)가 열려 있다 — 다만 우회는 **명시적이라 흔적이 남는다**. (현재 `<id>` ∈ {inventory-gate})
+- **`⟦권고⟧`** = 코드 재도출도 시점 차단도 불가. 에이전트 자기보고에 의존하므로 **정직하게 advisory**. (태그 없는 체크박스는 전부 `⟦권고⟧`.)
 
 핵심 명제 세 줄:
 
@@ -45,9 +46,17 @@ cd coding && ./install.sh <타깃-프로젝트-루트> [도메인...|--all]
 - **기존 파일 참조(표 부재)** → `code_review` 번들 인벤토리로 **코딩 전에** 작성한다(위임).
 - 표 양식(함수표·전역변수표 컬럼)의 권위는 **`code_review` 단일 SSOT** — coding 은 재정의하지 않고 그 양식을 따른다. (`code_review` 미설치 시에만 간이 표로 대체.)
 
+**이 선독은 훅이 차단으로 강제한다** (`hooks/coding-inventory-gate.py`). 선언만으로는 지켜지지 않았다 — 실사격에서 표 갱신을 "문서 작업"으로 분류해 코딩 뒤로 미루고 결국 안 한 사례가 있고, 그 결과 함수 용도를 오판했다(표에 용도가 적혀 있었다). 그래서 **읽기 전 수정을 물리적으로 막는다**:
+
+- `Write`/`Edit`/`MultiEdit`/`NotebookEdit` 대상이 코드 파일이면, 그 파일을 등재한 표를 이번 세션에 읽었는지 검사하고 미독이면 도구 호출을 거부한다(`PostToolUse(Read)` 가 읽은 파일을 세션별로 기록).
+- 요구하는 표는 **최근접 조상 모듈의 것**이다 — 표는 모듈 로컬(권위) + 루트 집계로 이중 기록되므로 권위본을 읽게 한다. 등재 판정은 표의 위치 컬럼 형식(`backend.py:315-349`)에 맞춘 `파일명:줄` 앵커이며, `docs/claude_guideline/**`(설치된 규칙 문서)는 표 후보에서 제외한다.
+- 표가 아예 없으면 **통과**가 기본값이다(인벤토리 미도입 프로젝트를 전면 차단하면 훅이 꺼져 강제력이 0 으로 회귀한다). 위 "표가 없으면 먼저 만든다"를 기계로 강제하려면 `CODING_GATE=strict`.
+- 오탐 우회는 사용자 승인 후 `.allow` 파일 또는 `CODING_GATE_SKIP=1`. 동작 검증은 `tests/inventory-gate.test.sh`.
+- **표 행은 훅이 직접 실어 나른다** — 경로만 알려주면 3만 바이트 표에서 그 행을 못 찾고 지나친다(실사격 오판의 직접 형태가 '표는 있었는데 그 행을 안 봤다'였다). `coding-reminder.py` 가 **계획 전**에 프롬프트 심볼의 행을, 게이트가 **수정 직전**에 대상 파일의 행을 각각 보여준다. 정렬은 이번 수정/프롬프트의 식별자와 **단어 경계** 일치하는 행 우선, 표 행이 산문보다 우대. 검증은 `tests/reminder-inject.test.sh`.
+
 falsifiable 체크박스(빈 약속 금지 — 무엇을 읽었는지 명시):
 
-- [ ] **계획 전**, 함수표·전역변수표(모듈 로컬 원본 + 루트 집계) + flowchart·ADR(Architecture Decision Record, 설계 결정 기록)를 읽었다(없으면 위 규칙으로 먼저 생성) — *읽은 파일 목록 첨부* `⟦권고⟧`
+- [ ] **계획 전**, 함수표·전역변수표(모듈 로컬 원본 + 루트 집계) + flowchart·ADR(Architecture Decision Record, 설계 결정 기록)를 읽었다(없으면 위 규칙으로 먼저 생성) — *읽은 파일 목록 첨부* `⟦훅:inventory-gate⟧`
 - [ ] 그 표로 중복 후보 **함수**를 확인했다 — 사후조건: 커밋 시 충돌이 재도출됨 `⟦CI:dup-signature⟧`
 - [ ] 그 표로 중복 **변수**·불필요한 전역변수를 확인했다 (평가 권위 → `code_review` 의 `[품질]`) `⟦권고⟧`
 - [ ] 외부 매뉴얼·datasheet 인용이 필요하면 `external_reference` 규칙을 따른다(인용 권위는 그 번들 단일 SSOT) `⟦권고⟧` → `docs/claude_guideline/external_reference/`
@@ -81,13 +90,14 @@ kill-test("이 트리거가 없으면 무슨 사고가 나는가" 답 가능) �
 ## 6. 후속 갱신 (write) — §2 read 와 대칭
 
 - **상태-미러형**(함수표·변수표·flowchart·인덱스): 덮어쓰기. **이중 기록** = 모듈 로컬(권위) + 루트 집계. 인덱스 stale 시 차단 `⟦CI:index-fresh⟧`
+- 폐루프의 양끝이 모두 기계로 막혀 있다 — 여기(write)는 `⟦CI:index-fresh⟧`(커밋 시), §2(read)는 `⟦훅:inventory-gate⟧`(수정 시). 내가 여기서 갱신해야 다음 작업이 §2 에서 최신 표를 읽고, §2 에서 읽어야 애초에 코드를 고칠 수 있다.
 - **로그-누적형**(ADR·수정이력): append / supersede(덮어쓰기 금지, 기존은 `Status: Superseded`)
 - 미해결 **이해·의도 부채**는 `debt` 번들에 등록(위임 — coding 은 '식별'만; **`debt` 미설치 시 식별만 주석/ADR 에 남김, 무해**) `⟦권고⟧`
 
 ## 룰 (요약)
 
 1. trivial 은 fast-path, 사전조사·트리거 면제
-2. `⟦CI⟧` 만 진짜 강제, `⟦권고⟧` 는 정직한 advisory (green ≠ good)
+2. `⟦CI⟧`(커밋 시 재도출)·`⟦훅⟧`(수정 시 차단) 이 진짜 강제, `⟦권고⟧` 는 정직한 advisory (green ≠ good)
 3. 비가역 변경 ADR 에 Rollback Plan 필드
 4. 금지 패턴 0 (secret·eval·raw SQL·async blocking)
 5. 공개함수 단위 검증(§4) + 전체 회귀(§5) — 변경 공개함수마다 테스트 ≥ 1
@@ -105,8 +115,11 @@ test -f docs/claude_guideline/coding/coding.md || echo "(coding 룰 비활성)"
 # 강제 태그 ↔ 백킹 스크립트 정합 (메타 불변식: 번들이 자기 강제력에 대해 거짓말 못 함)
 bash docs/claude_guideline/coding/checks/check-mapping.sh
 
-# ⟦CI⟧ 태그가 실제 스크립트를 가리키는지 빠른 확인
-grep -oE '⟦CI:[a-z-]+⟧' docs/claude_guideline/coding/coding.md | sort -u
+# ⟦CI⟧·⟦훅⟧ 태그가 실제 스크립트/훅을 가리키는지 빠른 확인
+grep -oE '⟦(CI|훅):[a-z-]+⟧' docs/claude_guideline/coding/coding.md | sort -u
+
+# 인벤토리 게이트 동작 검증 (설치본에서 재실행 가능 — 선언만 하고 검증 안 하는 실패 방지)
+bash docs/claude_guideline/coding/tests/inventory-gate.test.sh
 
 # MUST 예산 (룰 요약 항목 ≤ 7)
 test "$(grep -cE '^[0-9]+\. ' docs/claude_guideline/coding/coding.md)" -le 7 || echo "MUST 예산 초과"
@@ -114,10 +127,11 @@ test "$(grep -cE '^[0-9]+\. ' docs/claude_guideline/coding/coding.md)" -le 7 || 
 
 ## 변경 절차
 
-- SSOT 는 본 번들 폴더. 규칙 변경은 사용자 승인 후 `coding.md`·`conventions.md`·`stack.md`·`domains/` + `checks/*.sh` 를 **단일 번들 VERSION 으로 동반 갱신**(부분 버전 드리프트 금지).
+- SSOT 는 본 번들 폴더. 규칙 변경은 사용자 승인 후 `coding.md`·`conventions.md`·`stack.md`·`domains/` + `checks/*.sh`·`hooks/*.py` 를 **단일 번들 VERSION 으로 동반 갱신**(부분 버전 드리프트 금지).
 - `⟦CI:<id>⟧` 태그를 추가/변경하면 반드시 `checks/<id>.sh` 와 `check-mapping.sh` 를 함께 갱신한다.
+- `⟦훅:<id>⟧` 태그를 추가/변경하면 반드시 `hooks/coding-<id>.py` + `install.sh` 의 이벤트 등록 + `tests/` 의 계약 테스트를 함께 갱신한다. 훅은 사용자 작업을 차단하므로 **테스트 없이 출하 금지**.
 - semver + CHANGELOG. 자매 번들과 동일하게 파일 말미 `VERSION` 으로 표기.
 
 ---
 
-**VERSION**: 1.0.0 (CI 재도출 척추 + 작성 규율 advisory + never-self-approve 헌법 + trivial fast-path; 강제 태그 ⟦CI⟧/⟦권고⟧ 2분류; 강제 로직은 checks/*.sh 위임; self-contained·OMC-free)
+**VERSION**: 1.1.0 (CI 재도출 척추 + 작성 규율 advisory + never-self-approve 헌법 + trivial fast-path; 강제 태그 ⟦CI⟧/⟦훅⟧/⟦권고⟧ 3분류; 강제 로직은 checks/*.sh·hooks/*.py 위임; §2 함수표 선독을 inventory-gate 훅이 시점 차단 — 최근접 조상 모듈 표 + `파일명:줄` 앵커, 실사격 저장소 실측 확정; self-contained·OMC-free)

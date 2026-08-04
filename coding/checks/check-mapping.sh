@@ -41,10 +41,40 @@ for f in "$DIR"/*.sh; do
   fi
 done
 
+# ── ⟦훅:<id>⟧ ↔ hooks/coding-<id>.py ────────────────────────────────────────
+# 훅은 '도구 호출 시점 차단'이라 CI 와 강제 종류가 다르지만, 번들이 자기 강제력을
+# 거짓 신고하면 안 되는 것은 같다. 태그 없는 훅(번들 전역 목적)은 아래 목록에만 허용 —
+# 새 훅을 무태그로 추가하면 실패시켜 '태그를 달지, 예외로 둘지' 판단을 강제한다.
+HOOKS_DIR="$SRC/hooks"
+UNTAGGED_OK="coding-reminder.py"
+
+htags=$(grep -hoE '⟦훅:[a-z][a-z-]*⟧' "${files[@]}" 2>/dev/null | sed -E 's/^⟦훅:(.*)⟧$/\1/' | sort -u)
+
+for id in $htags; do
+  if [ ! -f "$HOOKS_DIR/coding-$id.py" ]; then
+    echo "✗ 빈 약속: 태그 ⟦훅:$id⟧ 가 가리키는 hooks/coding-$id.py 가 없음"
+    fail=1
+  fi
+done
+
+if [ -d "$HOOKS_DIR" ]; then
+  for f in "$HOOKS_DIR"/*.py; do
+    [ -f "$f" ] || continue
+    base=$(basename "$f")
+    case " $UNTAGGED_OK " in *" $base "*) continue ;; esac
+    id="${base#coding-}"; id="${id%.py}"
+    if ! printf '%s\n' "$htags" | grep -qx "$id"; then
+      echo "✗ 무태그 훅: hooks/$base 가 어느 ⟦훅⟧ 태그에도 안 걸림 (태그를 달거나 UNTAGGED_OK 에 등재)"
+      fail=1
+    fi
+  done
+fi
+
 n=$(printf '%s\n' "$tags" | grep -c .)
+hn=$(printf '%s\n' "$htags" | grep -c .)
 if [ "$fail" -eq 0 ]; then
-  echo "✓ 강제 정합: ⟦CI⟧ 태그 ↔ checks/*.sh 1:1 ($n 개, 코어+도메인 스캔)"
+  echo "✓ 강제 정합: ⟦CI⟧ ↔ checks/*.sh ($n 개) · ⟦훅⟧ ↔ hooks/coding-*.py ($hn 개), 코어+도메인 스캔"
 else
-  echo "— 약속된 태그 $n 개: $(echo "$tags" | tr '\n' ' ')"
+  echo "— 약속된 태그: CI $n 개 [$(echo "$tags" | tr '\n' ' ')] · 훅 $hn 개 [$(echo "$htags" | tr '\n' ' ')]"
 fi
 exit $fail

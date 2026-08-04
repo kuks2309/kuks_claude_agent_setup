@@ -102,7 +102,7 @@ cd code_review && ./install.sh <타깃-프로젝트-루트> [도메인...]
 
 ### 4. 전역 변수 / 모듈 상수 표
 
-컬럼 순서 고정: `#`, `사용처(함수)`, `기능`, `위치(file:line)`.
+컬럼 순서 고정: `#`, `변수`, `사용처(함수)`, `기능`, `위치(file:line)`.
 
 **포함 범위**: 진정한 전역 변수(mutable module-level state), 모듈 레벨 상수, 환경 의존 default 경로(절대경로 상수), C/C++ `static` 파일 스코프 변수, `extern` 노출 변수.
 
@@ -343,4 +343,4 @@ done
 
 ---
 
-**VERSION**: 1.3.0 (이중 기록 유지 + 플로우차트 drawio 동반·검증 추가 — checks/drawio_validate.py, 박스·화살표 dangling 0)
+**VERSION**: 1.3.1 (전역 변수 표 `변수` 컬럼 복원 — 이식 중 누락되어 변수명을 적을 칸이 없던 결함 수선)
