@@ -45,11 +45,15 @@ CODE_EXT = {
     ".sh", ".bash", ".zsh", ".rs", ".go", ".java", ".kt", ".kts",
     ".rb", ".lua", ".m", ".mm", ".swift", ".cs", ".php", ".scala",
     ".ex", ".exs", ".erl", ".hs", ".jl", ".r", ".pl",
+    # Arduino 스케치 — 실배포(T-IO-Boards)에서 표가 .ino 를 37회 등재하는데
+    # 확장자 누락으로 게이트가 통째로 무력했다. 합성 fixture 로는 안 잡히는 종류.
+    ".ino", ".pde",
 }
 
 SKIP_DIRS = {
     ".git", "node_modules", "build", "install", "log", "__pycache__",
     ".venv", "venv", "dist", ".mypy_cache", ".pytest_cache",
+    ".pio",   # PlatformIO vendored 의존성(libdeps/ 안의 라이브러리 예제·표)
 }
 
 MAX_CANDIDATES = 400          # 표 후보 스캔 상한 (대형 repo 지연 방지)

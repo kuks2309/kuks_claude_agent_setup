@@ -238,6 +238,30 @@ hook PreToolUse Edit "$BACKEND" sess-A
 check "exit 2 (차단)" 2 "$RC"
 teardown
 
+echo "T8b Arduino 스케치(.ino)도 게이트 대상 — 실배포에서 발견된 누락"
+setup
+mkdir -p "$FIX/Circuits/IO-Board/ETH_LAN8720/docs/code_review/eth"
+cat > "$FIX/Circuits/IO-Board/ETH_LAN8720/docs/code_review/eth/2026-05-21.md" <<'EOF'
+| # | 함수 | 입력 | 출력 | 기능 | 위치(file:line) |
+|---|---|---|---|---|---|
+| 1 | `setup` | — | void | Serial init, SPI 핀 설정, CAN bus init | ETH_LAN8720.ino:43-57 |
+EOF
+echo "void setup(){}" > "$FIX/Circuits/IO-Board/ETH_LAN8720/ETH_LAN8720.ino"
+hook PreToolUse Edit "Circuits/IO-Board/ETH_LAN8720/ETH_LAN8720.ino" sess-A
+check "exit 2 (차단)" 2 "$RC"
+has "표 행이 동봉됨" "Serial init, SPI 핀 설정"
+teardown
+
+echo "T8c vendored 의존성 폴더(.pio/libdeps)의 표는 후보에서 제외"
+setup
+mkdir -p "$FIX/pkg/.pio/libdeps/lib/docs/code_review/vendor" "$FIX/pkg"
+echo '| 1 | `vendor_fn` | 벤더 예제 | widget.ino:9 |' \
+  > "$FIX/pkg/.pio/libdeps/lib/docs/code_review/vendor/x.md"
+echo "void loop(){}" > "$FIX/pkg/widget.ino"
+hook PreToolUse Edit "pkg/widget.ino" sess-A
+check "exit 0 (통과 — vendored 표는 무시)" 0 "$RC"
+teardown
+
 echo "T9  표 미등재 파일 → 기본 통과 (오탐 차단)"
 setup
 hook PreToolUse Edit "src/Comm/CAN/can_relay/can_relay/helper.py" sess-A
