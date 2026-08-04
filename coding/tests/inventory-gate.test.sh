@@ -311,6 +311,15 @@ hook PreToolUse MultiEdit "$BACKEND" sess-A
 check "exit 2 (차단)" 2 "$RC"
 teardown
 
+echo "T15b 저장소 경로가 공백으로 끝나도 동작 (git 출력 strip 이 이름 일부를 지움)"
+setup
+NEW="${FIX}dir "                      # 디렉터리 이름 자체가 공백으로 끝남
+mv "$FIX" "$NEW" && FIX="$NEW" && ERRF="$FIX/.stderr"
+hook PreToolUse Edit "$BACKEND" sess-A
+check "exit 2 (차단)" 2 "$RC"
+has "표 경로가 정상 산출됨" "$LOCALTBL"
+teardown
+
 echo "T16 잘못된 stdin(빈 입력) → 통과 (훅이 작업을 막지 않음)"
 setup
 printf '' | "$PY" "$HOOK" >/dev/null 2>"$ERRF"
