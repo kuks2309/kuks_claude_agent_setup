@@ -203,6 +203,7 @@ entry 의 판정 **내용 자체** — 원인 분석의 진단, 재발 방지의
 ## 기존 기록 검토 시점
 
 - **세션 시작 (자동)** — 번들 설치 시 등록되는 SessionStart hook (`hooks/mistake-inject.py`) 이 `docs/claude-mistake/INDEX.md` §메타 패턴 + §미해결 항목 과 open entry·청소 미완 `retracted` entry 목록을 자동 주입한다. hook 미등록 환경은 수동 `head -50 docs/claude-mistake/INDEX.md`.
+- **세션 첫 코드 수정 전 (자동 게이트)** — PreToolUse hook (`hooks/pre_tool_use_require_records_read.py`) 이 open entry 를 이 세션에서 Read 하기 전의 코드 파일 Edit/Write 를 거부한다 — §Closure 규칙 격상 사다리의 ③ PreToolUse 게이트 실체 (거부/에러난 Read 는 불인정). 룰 파일 (`docs/claude_guideline/mistake/mistake.md`) 이 설치된 repo 에서만 발동하며, hook 미등록 환경은 위 수동 검토가 유일한 방어선이다.
 - **작업 시작 전 (수동)** — 동일 영역 / 카테고리에서 기존 사건이 있었는지 `docs/claude-mistake/` 폴더를 빠르게 훑는다.
 - **사용자 정정 직후** — 같은 세션의 다음 작업 전 정정한 카테고리의 `## 재발 방지` 절을 재독한다 (재발 방지 미적용 차단).
 - **기록 대조 보고 (검토의 산출물 형식)** — 위 검토의 보고는 3 줄이면 충분하다: ① 읽은 기록 경로 ② 이미 결정된 것 ③ 그에 따른 이번 턴 행동. **"이미 완료됨 / 보류로 결정됨 — 추가 작업 없음" 도 완결된 산출물이다** — 매 턴 새 산출물을 내려는 편향이 기록 확인을 건너뛰게 만드는 실패 (category `record-skip`) 를 본 형식이 차단한다.
