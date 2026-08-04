@@ -163,7 +163,8 @@ else
   echo "✓ CLAUDE.md 등록 추가"
 fi
 
-# 4) SessionStart 훅 — INDEX §메타 패턴·§미해결 항목 + open entry 목록 주입
+# 4) 훅 등록 — SessionStart(mistake-inject: INDEX 요약·open entry 주입)
+#    + PreToolUse(records-read 게이트: open entry 미독 시 코드 수정 거부)
 if ls "$SRC/hooks/"*.py >/dev/null 2>&1; then
   mkdir -p "$DEST/hooks"
   cp "$SRC/hooks/"*.py "$DEST/hooks/"
@@ -181,21 +182,32 @@ if ls "$SRC/hooks/"*.py >/dev/null 2>&1; then
     [ -f "$SETTINGS" ] && cp "$SETTINGS" "$SETTINGS.bak" && echo "✓ 백업: .claude/settings.json.bak"
     HOOK_BASE="\$CLAUDE_PROJECT_DIR/docs/claude_guideline/$BUNDLE/hooks"
     INJECT_CMD="$PYBIN \"$HOOK_BASE/$BUNDLE-inject.py\""
-    "$PYBIN" - "$SETTINGS" "$INJECT_CMD" <<'PYEOF'
+    GATE_CMD="$PYBIN \"$HOOK_BASE/pre_tool_use_require_records_read.py\""
+    "$PYBIN" - "$SETTINGS" "$INJECT_CMD" "$GATE_CMD" <<'PYEOF'
 import json, sys
-settings_path, inject_cmd = sys.argv[1], sys.argv[2]
+settings_path, inject_cmd, gate_cmd = sys.argv[1], sys.argv[2], sys.argv[3]
 try:
     with open(settings_path, encoding="utf-8") as f:
         cfg = json.load(f)
 except (FileNotFoundError, json.JSONDecodeError):
     cfg = {}
 hooks = cfg.setdefault("hooks", {})
-groups = hooks.setdefault("SessionStart", [])
-if any(h.get("command") == inject_cmd for g in groups for h in g.get("hooks", [])):
-    print("• settings.json SessionStart 훅 이미 존재 — 스킵")
-else:
-    groups.append({"hooks": [{"type": "command", "command": inject_cmd, "timeout": 5}]})
-    print("✓ settings.json SessionStart 훅 등록")
+
+
+def register(event, cmd, timeout, matcher=None):
+    groups = hooks.setdefault(event, [])
+    if any(h.get("command") == cmd for g in groups for h in g.get("hooks", [])):
+        print("• settings.json %s 훅 이미 존재 — 스킵" % event)
+        return
+    entry = {"hooks": [{"type": "command", "command": cmd, "timeout": timeout}]}
+    if matcher:
+        entry["matcher"] = matcher
+    groups.append(entry)
+    print("✓ settings.json %s 훅 등록" % event)
+
+
+register("SessionStart", inject_cmd, 5)
+register("PreToolUse", gate_cmd, 5, matcher="Edit|Write|MultiEdit")
 with open(settings_path, "w", encoding="utf-8") as f:
     json.dump(cfg, f, ensure_ascii=False, indent=2)
 PYEOF
