@@ -70,11 +70,14 @@ def rule_active(cwd):
 
 
 def _git(cwd, *args):
+    """git 출력 1줄. **개행만** 제거한다 — `.strip()` 은 경로 이름의 일부인 공백까지
+    지운다(실배포에서 `.../LGIT-C6-Cobot ` 처럼 공백으로 끝나는 폴더를 만나 repo_top 이
+    없는 경로를 반환 → 스캔 0건 → 게이트가 통째로 무력해졌다)."""
     try:
         out = subprocess.run(["git", "-C", cwd, *args],
                              capture_output=True, text=True, timeout=3)
         if out.returncode == 0:
-            return out.stdout.strip()
+            return out.stdout.rstrip("\r\n")
     except (OSError, subprocess.SubprocessError):
         pass
     return None
