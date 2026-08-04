@@ -73,9 +73,14 @@ drift_pairs() {
     [ -f "$c" ] || continue
     printf '%s\t%s\n' "$c" "$DEST/checks/$(basename "$c")"
   done
-  if [ -f "$SRC/hooks/$BUNDLE-reminder.py" ]; then
-    printf '%s\t%s\n' "$SRC/hooks/$BUNDLE-reminder.py" "$DEST/hooks/$BUNDLE-reminder.py"
-  fi
+  for c in "$SRC/hooks/"*.py; do
+    [ -f "$c" ] || continue
+    printf '%s\t%s\n' "$c" "$DEST/hooks/$(basename "$c")"
+  done
+  for c in "$SRC/tests/"*.sh; do
+    [ -f "$c" ] || continue
+    printf '%s\t%s\n' "$c" "$DEST/tests/$(basename "$c")"
+  done
   if [ -f "$SRC/.pre-commit-config.yaml" ]; then
     printf '%s\t%s\n' "$SRC/.pre-commit-config.yaml" "$DEST/pre-commit-config.sample.yaml"
   fi
@@ -198,13 +203,27 @@ CLAUDE_MD="$TARGET/CLAUDE.md"; MARKER="kuks_agent_setup:$BUNDLE"; touch "$CLAUDE
 if grep -qF "$MARKER" "$CLAUDE_MD"; then echo "• CLAUDE.md 등록 이미 존재 — 스킵"
 else printf '\n' >> "$CLAUDE_MD"; cat "$SRC/claude.snippet.md" >> "$CLAUDE_MD"; echo "✓ CLAUDE.md 등록 추가"; fi
 
-# 강제 훅 — 등록(수동 포인터)을 트리거 게이트로: 트리거 감지 시 규칙 SOP 주입
-HOOK_PY="$BUNDLE-reminder.py"
-if [ -f "$SRC/hooks/$HOOK_PY" ]; then
+# 강제 훅 2종
+#   reminder       (UserPromptSubmit) — 트리거 감지 시 규칙 SOP 주입 [1세대: 주입]
+#   inventory-gate (PreToolUse/PostToolUse) — 함수표 선독을 차단으로 강제 [2세대: 차단]
+# 주입만으로는 "표 갱신은 코딩 끝나고" 미루기를 막지 못한 실사격 사례가 있어 차단을 더했다.
+if [ -d "$SRC/hooks" ]; then
   mkdir -p "$DEST/hooks"
-  cp "$SRC/hooks/$HOOK_PY" "$DEST/hooks/$HOOK_PY"
-  chmod +x "$DEST/hooks/$HOOK_PY" 2>/dev/null || true
-  echo "✓ 훅 복사: docs/claude_guideline/$BUNDLE/hooks/$HOOK_PY"
+  for h in "$SRC/hooks/"*.py; do
+    [ -f "$h" ] || continue
+    cp "$h" "$DEST/hooks/$(basename "$h")"
+    chmod +x "$DEST/hooks/$(basename "$h")" 2>/dev/null || true
+    echo "✓ 훅 복사: docs/claude_guideline/$BUNDLE/hooks/$(basename "$h")"
+  done
+  if [ -d "$SRC/tests" ]; then
+    mkdir -p "$DEST/tests"
+    for t in "$SRC/tests/"*.sh; do
+      [ -f "$t" ] || continue
+      cp "$t" "$DEST/tests/$(basename "$t")"
+      echo "✓ 테스트 복사: docs/claude_guideline/$BUNDLE/tests/$(basename "$t")"
+    done
+  fi
+
   PYBIN=""
   for c in python3 python; do
     if command -v "$c" >/dev/null 2>&1; then PYBIN="$c"; break; fi
@@ -215,24 +234,43 @@ if [ -f "$SRC/hooks/$HOOK_PY" ]; then
     mkdir -p "$TARGET/.claude"
     SETTINGS="$TARGET/.claude/settings.json"
     [ -f "$SETTINGS" ] && cp "$SETTINGS" "$SETTINGS.bak" && echo "✓ 백업: .claude/settings.json.bak"
-    HOOK_CMD="$PYBIN \"\$CLAUDE_PROJECT_DIR/docs/claude_guideline/$BUNDLE/hooks/$HOOK_PY\""
-    "$PYBIN" - "$SETTINGS" "$HOOK_CMD" <<'PYEOF'
+    HOOK_BASE="$PYBIN \"\$CLAUDE_PROJECT_DIR/docs/claude_guideline/$BUNDLE/hooks"
+    REMIND_CMD="$HOOK_BASE/$BUNDLE-reminder.py\""
+    GATE_CMD="$HOOK_BASE/$BUNDLE-inventory-gate.py\""
+    "$PYBIN" - "$SETTINGS" "$REMIND_CMD" "$GATE_CMD" \
+              "$([ -f "$SRC/hooks/$BUNDLE-reminder.py" ] && echo 1 || echo 0)" \
+              "$([ -f "$SRC/hooks/$BUNDLE-inventory-gate.py" ] && echo 1 || echo 0)" <<'PYEOF'
 import json, sys
-settings_path, cmd = sys.argv[1], sys.argv[2]
+settings_path, remind, gate, has_remind, has_gate = sys.argv[1:6]
 try:
     with open(settings_path, encoding="utf-8") as f:
         cfg = json.load(f)
 except (FileNotFoundError, json.JSONDecodeError):
     cfg = {}
-groups = cfg.setdefault("hooks", {}).setdefault("UserPromptSubmit", [])
-exists = any(h.get("command") == cmd for g in groups for h in g.get("hooks", []))
-if exists:
-    print("• settings.json UserPromptSubmit 훅 이미 존재 — 스킵")
-else:
-    groups.append({"hooks": [{"type": "command", "command": cmd, "timeout": 5}]})
-    with open(settings_path, "w", encoding="utf-8") as f:
-        json.dump(cfg, f, ensure_ascii=False, indent=2)
-    print("✓ settings.json UserPromptSubmit 훅 등록")
+hooks = cfg.setdefault("hooks", {})
+
+def ensure(event, cmd, timeout, matcher=None):
+    groups = hooks.setdefault(event, [])
+    if any(h.get("command") == cmd for g in groups for h in g.get("hooks", [])):
+        return "스킵"
+    g = {"hooks": [{"type": "command", "command": cmd, "timeout": timeout}]}
+    if matcher is not None:
+        g["matcher"] = matcher
+    groups.append(g)
+    return "추가"
+
+msg = []
+if has_remind == "1":
+    msg.append("UserPromptSubmit(reminder)=" + ensure("UserPromptSubmit", remind, 5))
+if has_gate == "1":
+    # PreToolUse 는 코드 수정을 차단, PostToolUse(Read) 는 읽은 표를 기록 — 둘이 한 쌍
+    msg.append("PreToolUse(gate)=" + ensure(
+        "PreToolUse", gate, 10, matcher="Write|Edit|MultiEdit|NotebookEdit"))
+    msg.append("PostToolUse(read-track)=" + ensure(
+        "PostToolUse", gate, 5, matcher="Read"))
+with open(settings_path, "w", encoding="utf-8") as f:
+    json.dump(cfg, f, ensure_ascii=False, indent=2)
+print("✓ settings.json 훅 등록: " + ", ".join(msg))
 PYEOF
   fi
 fi
