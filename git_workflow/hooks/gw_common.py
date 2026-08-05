@@ -16,6 +16,15 @@ RULE_REL = "docs/claude_guideline/git_workflow/git_workflow.md"
 SEG_SEP = re.compile(r"&&|\|\||;|\n|\|")
 CD_RE = re.compile(r"^\s*cd\s+(\"[^\"]*\"|'[^']*'|[^\s;&|]+)\s*$")
 
+# git 전역 옵션 중 **다음 토큰을 값으로 먹는** 것들(하위명령 탐색 시 건너뛰기).
+# `--opt=value` 형태는 토큰 하나라 별도 처리 불필요.
+GIT_OPTS_WITH_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace",
+                       "--config-env", "--super-prefix"}
+# 명령 위치 판정: 선행 `VAR=값` 대입과, 뒤 명령을 그대로 실행하는 무인자 래퍼만 투명 취급.
+# 인자를 받는 래퍼(`timeout 5 …`)는 일부러 제외 — 잘못 건너뛰면 엉뚱한 토큰을 명령으로 오인한다.
+ENV_ASSIGN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+TRANSPARENT_WRAPPERS = {"sudo", "env", "nohup", "command", "exec", "time"}
+
 
 def run_git(repo, *args, timeout=3):
     try:
@@ -31,6 +40,54 @@ def _tokens(command):
         return shlex.split(command)
     except ValueError:
         return command.split()
+
+
+def git_subcommands(command):
+    """명령에서 **실제로 호출된 git 하위명령** 목록 반환 (예: ["commit", "push"]).
+
+    부분문자열 매칭(`"commit" in cmd`)의 오탐을 없애기 위한 공용 판정기. 그 방식은
+    `.git/…/commits` 파일을 *읽기*만 하는 명령이나 "add" 를 포함한 단어(`address`·
+    `readd`)에도 발동해, 훅이 엉뚱한 명령을 커밋/푸시로 오인한다(소유권 기록 오염).
+
+    세그먼트(`&&`·`;`·`|`…)별로 토큰화 → `git` 토큰 탐색 → 전역 옵션(값 있는 것은
+    2토큰) 건너뛰기 → 첫 비-옵션 토큰을 하위명령으로 취한다.
+
+    `git` 는 **명령 위치에 있을 때만** git 호출로 본다(선행 `VAR=값` 대입과 소수의
+    래퍼는 건너뜀). 인자로 등장하는 `git`(예: `echo git commit`, `grep git file`)은
+    호출이 아니므로 무시 — 위치를 안 보면 이것들이 전부 오탐이 된다.
+
+    한계(정직): 셸 파싱 휴리스틱이라 `eval`·`xargs`·git alias·따옴표 안의 명령은
+              해석하지 못하고, 인자를 받는 래퍼(`timeout 5 git push`)도 놓친다.
+              오탐은 없애고 미탐은 남긴다 — 게이트가 조용히 통과시키는 편이
+              엉뚱한 차단·오기록보다 안전하다(전자는 사용자가 알아채고 재시도하지만,
+              후자는 소유권 기록을 오염시켜 게이트 판정 자체를 무너뜨린다).
+    """
+    found = []
+    for seg in SEG_SEP.split(command):
+        toks = _tokens(seg)
+        i, n = 0, len(toks)
+        # 명령 위치까지 전진: 선행 환경변수 대입(VAR=값)·투명 래퍼만 건너뛴다.
+        while i < n and (ENV_ASSIGN_RE.match(toks[i]) or toks[i] in TRANSPARENT_WRAPPERS):
+            i += 1
+        if i >= n or os.path.basename(toks[i]) != "git":
+            continue  # 명령 위치가 git 이 아님 → 이 세그먼트는 git 호출 아님
+        i += 1
+        while i < n and toks[i].startswith("-"):
+            if toks[i] in GIT_OPTS_WITH_VALUE:
+                i += 2
+                continue
+            i += 1
+        if i < n:
+            found.append(toks[i])
+    return found
+
+
+def runs_git(command, *subcommands):
+    """명령이 주어진 git 하위명령 중 하나라도 실제로 호출하는가."""
+    if not command:
+        return False
+    got = git_subcommands(command)
+    return any(s in got for s in subcommands)
 
 
 def target_dir(command, cwd):

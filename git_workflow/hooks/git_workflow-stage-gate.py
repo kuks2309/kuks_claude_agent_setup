@@ -131,10 +131,8 @@ def main():
     if data.get("tool_name") != "Bash":
         return
     cmd = str((data.get("tool_input") or {}).get("command", ""))
-    if not cmd or "git" not in cmd:
-        return
-    if "add" not in cmd and "commit" not in cmd:
-        return
+    if not gw.runs_git(cmd, "add", "commit"):
+        return  # 실제 `git add`/`git commit` 호출만 ("add"·"commit" 부분문자열 오탐 방지)
 
     cwd = gw.target_dir(cmd, data.get("cwd") or os.getcwd())
     # 활성화 판정은 저장소 최상위 기준 — 하위 디렉토리로 cd 해도 게이트가 꺼지지 않게.

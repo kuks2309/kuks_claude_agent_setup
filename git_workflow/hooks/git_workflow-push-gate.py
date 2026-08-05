@@ -118,8 +118,8 @@ def main():
     if data.get("tool_name") != "Bash":
         return
     cmd = str((data.get("tool_input") or {}).get("command", ""))
-    if "git" not in cmd or "push" not in cmd:
-        return
+    if not gw.runs_git(cmd, "push"):
+        return  # 실제 `git push` 호출만 (문자열에 "push" 가 든 무관한 명령 오탐 방지)
 
     cwd = gw.target_dir(cmd, data.get("cwd") or os.getcwd())
     # 활성화 판정은 저장소 최상위 기준 — 하위 디렉토리로 cd 해도 게이트가 꺼지지 않게.

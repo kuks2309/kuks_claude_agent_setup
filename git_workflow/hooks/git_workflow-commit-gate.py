@@ -17,8 +17,6 @@ self-contained. 계약: stdin JSON → 차단 시 permissionDecision=deny(JSON, 
 """
 import json
 import os
-import re
-import shlex
 import subprocess
 import sys
 
@@ -26,9 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gw_common as gw  # noqa: E402
 
 RULE_MD = "docs/claude_guideline/git_workflow/git_workflow.md"
-SEG_SEP = re.compile(r"&&|\|\||;|\n|\|")
 PROTECTED = {"main", "master"}
-CD_RE = re.compile(r"^\s*cd\s+(?P<path>\"[^\"]*\"|'[^']*'|[^\s;&|]+)\s*$")
 
 
 def deny(reason):
@@ -52,31 +48,14 @@ def _git(cwd, *args):
 
 
 def has_commit_subcmd(cmd):
-    """cmd 안에 실제 `git commit` 호출이 있으면 True (git add 등은 무시)."""
-    for seg in SEG_SEP.split(cmd):
-        seg = seg.strip()
-        if "git" not in seg or "commit" not in seg:
-            continue
-        try:
-            tokens = shlex.split(seg)
-        except ValueError:
-            if re.search(r"git\s+(-C\s+\S+\s+)?commit\b", seg):
-                return True
-            continue
-        i, n = 0, len(tokens)
-        while i < n and os.path.basename(tokens[i]) != "git":
-            i += 1
-        if i >= n:
-            continue
-        i += 1
-        while i < n and tokens[i].startswith("-"):
-            if tokens[i] in ("-C", "-c", "--git-dir", "--work-tree") and i + 1 < n:
-                i += 2
-                continue
-            i += 1
-        if i < n and tokens[i] == "commit":
-            return True
-    return False
+    """cmd 안에 실제 `git commit` 호출이 있으면 True (git add 등은 무시).
+
+    판정은 공용 `gw.runs_git` 에 위임한다. 이전 구현은 shlex 실패 시 정규식
+    `git\\s+…commit\\b` 로 fallback 했는데, 그 정규식이 **문자열 안의** `git commit`
+    (파이썬 스크립트·echo·테스트 데이터)까지 잡아 무관한 명령을 deny 했다.
+    공용 판정기는 `git` 이 **명령 위치**에 있을 때만 호출로 인정한다.
+    """
+    return gw.runs_git(cmd, "commit")
 
 
 def other_sessions_active(gd, sid):
@@ -108,7 +87,7 @@ def main():
     if data.get("tool_name") != "Bash":
         return
     cmd = str((data.get("tool_input") or {}).get("command", ""))
-    if "git" not in cmd or "commit" not in cmd:
+    if not has_commit_subcmd(cmd):
         return
 
     cwd = gw.target_dir(cmd, data.get("cwd") or os.getcwd())

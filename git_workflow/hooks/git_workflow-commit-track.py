@@ -27,8 +27,8 @@ def main():
     if data.get("tool_name") != "Bash":
         return
     cmd = str((data.get("tool_input") or {}).get("command", ""))
-    if "git" not in cmd or "commit" not in cmd:
-        return
+    if not gw.runs_git(cmd, "commit"):
+        return  # 실제 `git commit` 호출만 — 부분문자열 매칭은 소유권 기록을 오염시킨다
 
     cwd = data.get("cwd") or os.getcwd()
     repo = gw.resolve_repo(cmd, cwd)
