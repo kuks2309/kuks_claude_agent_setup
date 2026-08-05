@@ -28,7 +28,7 @@
 | **S4** | **operator 지정 (sudo 졸업)** | `tailscale debug prefs \| grep -i OperatorUser` | 자기 계정명이 출력됨 | **마지막 sudo** |
 | **S5** | 머신 이름 확정 | `tailscale status \| head -1` | 의도한 이름 그대로 (`-1` 접미사 없음) | 불필요 |
 | **S6** | 키 만료 정책 | 관리 콘솔의 해당 노드 | 사람이 못 붙는 머신은 **만료 끔** | — |
-| **S7** | SSH 수신 준비 | `systemctl is-active ssh` 또는 `tailscale debug prefs \| grep RunSSH` | `active` 또는 `RunSSH: true` | 불필요 |
+| **S7** | SSH 수신 준비 | `systemctl is-active ssh` 또는 `tailscale debug prefs \| grep RunSSH` | `active` 또는 `"RunSSH": true` | 불필요 |
 | **S8** | **반대편에서 접속 검증** | 다른 PC 에서 `ssh <계정>@<이름> true` | 종료 코드 `0` | 불필요 |
 
 **S8 을 생략하지 않는다.** 새 PC 에서 밖으로 나가는 것과 밖에서 그 PC 로 들어오는 것은 다른 경로이며, 원격 작업 대상으로 쓰려면 필요한 것은 후자다. 새 PC 앞에 앉아 확인할 수 있는 것이 아니라 **다른 PC 에서 실제로 붙어 봐야** 끝난 것이다.
@@ -82,11 +82,14 @@ sudo tailscale up
 관리 콘솔에서 auth key 를 발급해 사용한다.
 
 ```bash
-sudo tailscale up --authkey "$TS_AUTHKEY" --hostname <머신이름>
+sudo tailscale up --auth-key=file:/run/ts-key --hostname <머신이름>
+shred -u /run/ts-key
 ```
 
+- 플래그는 `--auth-key` 다(`--authkey` 아님).
+- **키를 명령줄 인자로 직접 넘기지 않는다.** 인자는 `ps` 로 다른 사용자에게 그대로 보인다. `file:<경로>` 형식은 키를 파일에서 읽으므로 인자에 남지 않으며, 쓰고 나면 파일을 지운다.
 - 실기·서버처럼 반복 재설치가 예상되면 **재사용 가능(reusable) 키**로 발급한다.
-- **auth key 를 저장소·스크립트·로그·명령 이력에 남기지 않는다.** 위처럼 환경 변수로 전달하고, 쓰고 나면 `unset TS_AUTHKEY` 한다.
+- **auth key 를 저장소·스크립트·로그·셸 이력에 남기지 않는다.**
 - 키에는 유효기간이 있다. 온보딩 실패 원인이 키 만료인 경우가 흔하므로 발급 시각을 확인한다.
 
 ## 4. sudo 졸업 — operator 지정 (S4) ★
