@@ -64,6 +64,53 @@ link_shared_assets(){
   fi
 }
 
+# push 성공 후 공유 저장소의 **로컬 main** 을 origin/main 에 맞춘다.
+#
+# 왜 필요한가: 병합은 임시 detached worktree 에서 일어나 origin 으로 push 되고 그 트리는
+# 폐기된다. 즉 refs/heads/main 을 갱신하는 경로가 없어, 세션이 끝날 때마다 origin 만
+# 전진하고 공유 main 은 제자리에 남는다 — 발산이 누적되는 구조적 원인.
+#
+# 3분기: main 미체크아웃 → ref 만 갱신(작업트리 무영향) / 체크아웃+clean → fast-forward /
+#        dirty → **보류하고 소리내어 경고**. 조용한 보류가 이 사태를 키웠으므로 침묵 금지.
+sync_local_main(){
+  local repo="$1"
+  git -C "$repo" fetch origin -q 2>/dev/null || true
+  git -C "$repo" show-ref --verify --quiet refs/remotes/origin/main || return 0
+
+  local head; head="$(git -C "$repo" symbolic-ref --quiet --short HEAD 2>/dev/null || echo "")"
+
+  if [ "$head" != "main" ]; then
+    # main 이 체크아웃돼 있지 않음 → ref 직접 갱신이 안전(작업트리 안 건드림).
+    if ! git -C "$repo" show-ref --verify --quiet refs/heads/main; then
+      return 0   # 로컬 main 자체가 없음(신규 클론 등)
+    fi
+    if git -C "$repo" merge-base --is-ancestor main origin/main 2>/dev/null; then
+      if git -C "$repo" update-ref refs/heads/main origin/main 2>/dev/null; then
+        say "로컬 main → origin/main 동기화(ref 갱신)"
+      else
+        err "⚠ 로컬 main ref 갱신 실패 — origin/main 과 벌어진 채 남습니다."
+      fi
+    else
+      err "⚠ 로컬 main 이 origin/main 의 조상이 아님(발산) — 자동 동기화 보류."
+      err "   확인: git -C \"$repo\" log --oneline origin/main..main"
+    fi
+    return 0
+  fi
+
+  # main 체크아웃 중 — 미커밋 변경이 있으면 ff 가 남의 작업을 흔들 수 있어 보류.
+  if [ -n "$(git -C "$repo" status --porcelain 2>/dev/null)" ]; then
+    err "⚠ 공유 작업트리에 미커밋 변경이 있어 로컬 main fast-forward 보류."
+    err "   origin/main 과 벌어진 채 남습니다. 정리 후: git -C \"$repo\" merge --ff-only origin/main"
+    return 0
+  fi
+  if git -C "$repo" merge --ff-only origin/main -q 2>/dev/null; then
+    say "로컬 main → origin/main 동기화(fast-forward)"
+  else
+    err "⚠ 로컬 main fast-forward 실패(발산 가능) — 자동 동기화 보류."
+    err "   확인: git -C \"$repo\" log --oneline origin/main..main"
+  fi
+}
+
 # 이 브랜치를 체크아웃한 worktree 경로 (없으면 빈 문자열)
 worktree_of_branch(){
   git -C "$1" worktree list --porcelain | awk -v b="refs/heads/$2" '
@@ -144,6 +191,7 @@ cmd_end(){
     [ -n "$swt" ] && git -C "$repo" worktree remove --force "$swt" 2>/dev/null || true
     git -C "$repo" branch -D "$branch" -q 2>/dev/null || true
     git -C "$repo" push origin --delete "$branch" -q 2>/dev/null || true
+    sync_local_main "$repo"   # origin 만 전진하고 공유 main 이 뒤처지는 발산 차단
     say "✓ $branch → main 병합·push 완료, worktree·브랜치 정리됨"
     exit 0
   fi

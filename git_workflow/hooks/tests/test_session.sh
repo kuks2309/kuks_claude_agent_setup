@@ -92,5 +92,41 @@ WTD="$ROOT/repo-ses-SESD"
 [ -f "$WTD/docs/claude_guideline/session_workflow/session_workflow.md" ] \
   && ok link_whole_reachable || no link_whole_reachable "링크 경유 도달 불가"
 
+# 회귀 방지: 병합은 임시 detached worktree 에서 일어나 origin 으로 push 되므로,
+# refs/heads/main 을 갱신하지 않으면 origin 만 전진하고 공유 main 이 영구히 뒤처진다.
+# (실제 사고: 로컬 main 이 origin/main 대비 55 커밋 뒤처진 채 발산)
+echo "== end (로컬 main 동기화 — clean → fast-forward) =="
+setup
+run start SESE >/dev/null 2>&1
+WTE="$ROOT/repo-ses-SESE"
+echo "E작업" > "$WTE/e.txt"; git -C "$WTE" add -A; git -C "$WTE" commit -q -m "E work"
+run end SESE >/dev/null 2>&1
+[ "$(git -C "$ROOT/repo" rev-parse main)" = "$(git -C "$ROOT/repo" rev-parse origin/main)" ] \
+  && ok local_main_ff || no local_main_ff "로컬 main 이 origin/main 과 불일치(발산)"
+[ -f "$ROOT/repo/e.txt" ] && ok local_worktree_updated || no local_worktree_updated "작업트리에 병합 결과 미반영"
+
+echo "== end (로컬 main 동기화 — dirty → 보류 + 경고) =="
+setup
+run start SESF >/dev/null 2>&1
+WTF="$ROOT/repo-ses-SESF"
+echo "F작업" > "$WTF/f.txt"; git -C "$WTF" add -A; git -C "$WTF" commit -q -m "F work"
+echo "미커밋 편집" >> "$ROOT/repo/file.txt"      # 타 세션이 공유 트리에서 작업 중인 상황
+OUT="$(run end SESF 2>&1)"
+[ "$(git -C "$ROOT/repo" rev-parse main)" != "$(git -C "$ROOT/repo" rev-parse origin/main)" ] \
+  && ok dirty_ff_deferred || no dirty_ff_deferred "dirty 인데 ff 강행(타 세션 작업 위험)"
+echo "$OUT" | grep -q "보류" && ok dirty_warns || no dirty_warns "보류를 조용히 처리(경고 없음)"
+[ "$(tail -1 "$ROOT/repo/file.txt")" = "미커밋 편집" ] \
+  && ok dirty_preserved || no dirty_preserved "타 세션 미커밋 변경이 사라짐"
+
+echo "== end (로컬 main 동기화 — main 미체크아웃 → ref 갱신) =="
+setup
+git -C "$ROOT/repo" checkout --detach -q          # 공유 트리가 main 을 안 물고 있는 상태
+run start SESG >/dev/null 2>&1
+WTG="$ROOT/repo-ses-SESG"
+echo "G작업" > "$WTG/g.txt"; git -C "$WTG" add -A; git -C "$WTG" commit -q -m "G work"
+run end SESG >/dev/null 2>&1
+[ "$(git -C "$ROOT/repo" rev-parse refs/heads/main)" = "$(git -C "$ROOT/repo" rev-parse origin/main)" ] \
+  && ok detached_ref_updated || no detached_ref_updated "main ref 미갱신"
+
 echo "-- 결과: PASS=$PASS FAIL=$FAIL --"
 [ "$FAIL" = 0 ]
