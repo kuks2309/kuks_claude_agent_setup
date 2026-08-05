@@ -7,9 +7,10 @@
 # 동작:
 #   1) git_workflow.md + hooks/*.py 를 <타깃>/docs/claude_guideline/git_workflow/ 로 복사
 #   2) claude.snippet.md 를 <타깃>/CLAUDE.md 에 append (마커 중복방지)
-#   3) 훅 5종을 .claude/settings.json 에 멱등 등록:
+#   3) 훅 8종을 .claude/settings.json 에 멱등 등록:
 #      reminder(UserPromptSubmit) + track(PostToolUse·파일) + commit-track(PostToolUse·Bash)
 #      + stage-gate(PreToolUse·Bash) + commit-gate(PreToolUse·Bash) + push-gate(PreToolUse·Bash)
+#      + tree-gate(PreToolUse·Bash) + session-end(SessionEnd)
 #   4) 설치 성공 시 <타깃>/docs/claude_guideline/INSTALLED.md 에 자기 행 기록(커밋·날짜·인자)
 #   설치 산출물은 규칙·훅뿐 — install.sh·claude.snippet.md 는 복사하지 않는다.
 #
@@ -156,8 +157,9 @@ else
   echo "✓ CLAUDE.md 등록 추가"
 fi
 
-# 훅 6종 — reminder(UserPromptSubmit)·track(PostToolUse·파일)·commit-track(PostToolUse·Bash)
-#          ·stage-gate(PreToolUse·Bash)·push-gate(PreToolUse·Bash)
+# 훅 8종 — reminder(UserPromptSubmit)·track(PostToolUse·파일)·commit-track(PostToolUse·Bash)
+#          ·stage-gate(PreToolUse·Bash)·commit-gate(PreToolUse·Bash)·push-gate(PreToolUse·Bash)
+#          ·tree-gate(PreToolUse·Bash: 트리 전역 파괴 명령이 타 세션 미커밋 변경을 걷어가는 것 차단)
 #          ·session-end(SessionEnd: session/<id> 브랜치 → main 안전 병합, git_workflow-session.sh)
 if ls "$SRC/hooks/"*.py >/dev/null 2>&1; then
   mkdir -p "$DEST/hooks"
@@ -182,11 +184,13 @@ if ls "$SRC/hooks/"*.py >/dev/null 2>&1; then
     CTRACK_CMD="$PYBIN \"$HOOK_BASE/$BUNDLE-commit-track.py\""
     CGATE_CMD="$PYBIN \"$HOOK_BASE/$BUNDLE-commit-gate.py\""
     PUSHGATE_CMD="$PYBIN \"$HOOK_BASE/$BUNDLE-push-gate.py\""
+    TREEGATE_CMD="$PYBIN \"$HOOK_BASE/$BUNDLE-tree-gate.py\""
     SESSIONEND_CMD="$PYBIN \"$HOOK_BASE/$BUNDLE-session-end.py\""
-    "$PYBIN" - "$SETTINGS" "$REMINDER_CMD" "$TRACK_CMD" "$GATE_CMD" "$CTRACK_CMD" "$PUSHGATE_CMD" "$CGATE_CMD" "$SESSIONEND_CMD" <<'PYEOF'
+    "$PYBIN" - "$SETTINGS" "$REMINDER_CMD" "$TRACK_CMD" "$GATE_CMD" "$CTRACK_CMD" "$PUSHGATE_CMD" "$CGATE_CMD" "$TREEGATE_CMD" "$SESSIONEND_CMD" <<'PYEOF'
 import json, sys
 settings_path = sys.argv[1]
-reminder_cmd, track_cmd, gate_cmd, ctrack_cmd, pushgate_cmd, cgate_cmd, sessionend_cmd = sys.argv[2:9]
+(reminder_cmd, track_cmd, gate_cmd, ctrack_cmd, pushgate_cmd, cgate_cmd,
+ treegate_cmd, sessionend_cmd) = sys.argv[2:10]
 try:
     with open(settings_path, encoding="utf-8") as f:
         cfg = json.load(f)
@@ -211,6 +215,7 @@ register("PostToolUse", ctrack_cmd, matcher="Bash")
 register("PreToolUse", gate_cmd, matcher="Bash")
 register("PreToolUse", cgate_cmd, matcher="Bash")
 register("PreToolUse", pushgate_cmd, matcher="Bash")
+register("PreToolUse", treegate_cmd, matcher="Bash")
 register("SessionEnd", sessionend_cmd, timeout=100)
 
 with open(settings_path, "w", encoding="utf-8") as f:

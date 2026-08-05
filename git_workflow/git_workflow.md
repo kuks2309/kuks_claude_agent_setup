@@ -39,14 +39,17 @@ push·리뷰 방식이 모드에 갈리므로 **작업 전 먼저 판정**한다
 - **작업 단위 = 커밋 = push 단위** — 서로 다른 scope 변경을 한 커밋에 섞지 않는다. dirty tree 는 scope 별 분할 커밋.
 - **명시 staging (세션 격리)** — `git add <명시 경로>` 만. `git add -A` / `git add .` **금지**. 작업공간을 여러 세션이 공유하면 working tree 에 **타 세션의 미커밋 변경**이 섞일 수 있으므로 **이번 세션이 만든 파일만** staging 한다. commit 직전 `git diff --cached --name-only` 로 staged 범위가 이번 세션 산출물과 일치하는지 검증. 무관한 dirty 파일은 건드리지 않는다(모호하면 1줄 확인).
 - **세션 격리 자동화 (설치 시)** — `hooks/git_workflow-track.py`(PostToolUse) 가 이 세션이 수정한 파일을 `.git/git_workflow/sessions/<session_id>/touched` 에 누적하고, `hooks/git_workflow-reminder.py`(UserPromptSubmit) 가 git 트리거 시 그 목록을 주입한다 → staging 대상이 '이 세션 목록'으로 자동 grounding 된다(`.git` 내부라 비-커밋·세션별 분리). python 부재 시 이 자동화는 생략되고 규칙 텍스트만 생존(수동 식별).
-- **세션 격리 강제 게이트 (⟦CI⟧, 설치 시)** — 세 게이트가 staging·commit·push 전 구간을 하드 차단한다. 이로써 아래 §2-1 세션 브랜치가 권고가 아니라 **강제**된다.
+- **세션 격리 강제 게이트 (⟦CI⟧, 설치 시)** — 네 게이트가 staging·commit·push·트리복원 전 구간을 하드 차단한다. 이로써 아래 §2-1 세션 브랜치가 권고가 아니라 **강제**된다.
   | 게이트 | 시점 | 차단 대상 | override |
   | --- | --- | --- | --- |
   | `hooks/git_workflow-stage-gate.py` | PreToolUse | 타 세션 파일 staging·광역 staging(`-A`/`.`) | `# gw:allow-foreign` |
   | `hooks/git_workflow-commit-gate.py` | PreToolUse | **타 세션 활동 중 보호 브랜치(`main`/`master`) 직접 커밋** | `# gw:allow-main-commit` |
   | `hooks/git_workflow-push-gate.py` | PreToolUse | 타 세션 커밋이 섞인 `main` 직접 push (+ 판정 불가한 첫 push 도 타 세션 활동 시 차단) | `# gw:allow-main-push` |
+  | `hooks/git_workflow-tree-gate.py` | PreToolUse | **트리 전역 파괴 명령**(`stash`(경로 미지정)·`reset --hard`·`checkout/restore .`·`clean -f`)이 타 세션 미커밋 변경까지 걷어가는 것 | `# gw:allow-tree-wide` |
 
-  판정 근거는 `hooks/git_workflow-track.py`(PostToolUse) 가 기록한 세션별 수정 파일과 `hooks/git_workflow-commit-track.py`(PostToolUse) 가 기록한 세션 커밋 해시(둘 다 `.git` 내부 → 비-커밋·세션별 분리). **단일 세션이면 세 게이트 모두 통과**하므로 §2 기본(main 직접 커밋·push)은 그대로 동작한다.
+  판정 근거는 `hooks/git_workflow-track.py`(PostToolUse) 가 기록한 세션별 수정 파일과 `hooks/git_workflow-commit-track.py`(PostToolUse) 가 기록한 세션 커밋 해시(둘 다 `.git` 내부 → 비-커밋·세션별 분리). **단일 세션이면 네 게이트 모두 통과**하므로 §2 기본(main 직접 커밋·push)은 그대로 동작한다.
+
+  게이트의 진입 판정은 `gw_common.runs_git()` — `git` 이 **명령 위치**에 있을 때만 호출로 인정한다. 부분문자열 매칭(`"commit" in cmd`)을 쓰면 git 을 호출하지 않는 명령(문자열에 단어만 든 명령·`.git/…/commits` 파일 읽기)이 커밋으로 오인되어 **소유권 장부가 오염**되고, 그 장부로 판정하는 push-gate 가 무너진다.
   각 게이트의 override 는 env 로도 가능하다(`GW_ALLOW_FOREIGN`·`GW_ALLOW_MAIN_COMMIT`·`GW_ALLOW_MAIN_PUSH` = `1`). **판정 기준 저장소** — 명령 안의 선행 `cd <경로>` 를 반영해 *실제 대상 저장소* 를 기준으로 판정하고(다른 저장소 작업의 오탐 방지), 활성화 여부는 그 저장소의 **최상위(toplevel)** 에서 본 룰 파일 존재로 정한다(하위 디렉토리로 `cd` 해도 게이트가 꺼지지 않음). 변수·명령치환(`cd $D`)처럼 해석 불가하면 세션 cwd 기준을 유지한다(보수적). **한계(정직, 세 게이트 공통)**: 셸 파싱 휴리스틱(`eval`·`xargs`·git alias 우회 가능), 훅 미설치 세션은 미보호(타 세션 판정도 그 세션의 `track.py` 기록에 의존), Bash 로만 만든 파일은 미추적→override 필요, `git commit <path>` 미검사, detached HEAD·rebase/merge 중 커밋은 commit-gate 판정 대상 외.
 - **커밋 메시지** — `type(scope): subject` (`feat`·`fix`·`docs`·`refactor`·`style`·`chore`·`test`). 한국어 본문 허용. `Co-Authored-By` 푸터.
 - **파괴 명령 승인** — `git push --force`·`reset --hard`·`clean -f`·브랜치 삭제는 사용자 명시 승인 후에만.
@@ -70,6 +73,8 @@ push·리뷰 방식이 모드에 갈리므로 **작업 전 먼저 판정**한다
 - **작업 흐름 (도구: `hooks/git_workflow-session.sh`, ⟦CI⟧ 자동화)** —
   1. **시작**: `bash <…>/hooks/git_workflow-session.sh start <session_id>` → `origin/main` 기준 `../<repo>-ses-<id>` 링크드 worktree + `session/<id>` 브랜치 생성(공유 HEAD 불변). 출력된 그 폴더에서 작업·커밋한다(§1 규칙: 명시 staging·`type(scope): subject`+`Co-Authored-By`).
   2. **종료(자동)**: SessionEnd 훅 `git_workflow-session-end.py` 가 자동으로 `session/<id>` 를 `main` 에 **안전 병합**(임시 worktree 에서 `origin/main` 최신 위로 병합, `merge.lock` **flock 직렬화** → 동시 종료도 경쟁 없음)하고 `origin`+`fito` 둘 다 push 후 **worktree·브랜치(로컬+원격) 정리**한다. 수동 실행: `git_workflow-session.sh end <session_id>`.
+
+     정리 직후 **공유 저장소의 로컬 `main` 을 `origin/main` 에 맞춘다**(`sync_local_main`). 병합은 임시 detached worktree 에서 일어나 push 후 폐기되므로, 이 단계가 없으면 `refs/heads/main` 을 갱신하는 경로가 없어 **origin 만 전진하고 공유 `main` 은 영구히 뒤처진다**(실측: 55 커밋 발산). 분기 — `main` 미체크아웃 → `update-ref`(작업트리 무영향) / 체크아웃 + clean → `merge --ff-only` / **dirty → 보류하고 경고 출력**(타 세션 미커밋 변경을 ff 로 날리지 않기 위해). 보류는 반드시 소리내어 알린다.
   3. **충돌·발산 시**: 자동 병합을 **보류**(exit 3) — 브랜치·worktree 보존하고 사용자가 `git merge --no-ff session/<id>` 로 수동 해결. Claude 는 충돌을 자동 해결하지 않는다. 보류된 브랜치는 방치될수록 기준이 전진해 충돌이 커지므로, session_workflow 번들을 함께 쓰면 시작 주입이 **미회수 브랜치**(2일 이상)를 매번 노출한다.
 - **훅·규칙 상속(worktree)** — `start` 는 worktree 생성 직후 공유 트리의 `.claude/settings.json` 과 `docs/claude_guideline` 을 **심볼릭 링크**한다(`link_shared_assets`). worktree 는 git 추적 파일만 체크아웃하는데 설치본은 대개 미추적·gitignore 대상이라, 링크가 없으면 **세션 격리를 강제해야 할 그 트리에서 훅이 조용히 무동작**이 된다. 브랜치가 일부 번들을 추적 중이면 그 추적본은 덮지 않고 없는 번들만 링크한다.
 - **team 과의 구분** — 본 절차는 §3 team 의 PR·리뷰 승인 게이트를 도입하지 **않는다**. 브랜치 목적은 협업 리뷰가 아니라 **세션 이력 격리·동시 push 경쟁 방지**뿐. 병합은 훅이 무충돌일 때만 자동 수행(리뷰 게이트 아님), 충돌 시 사용자 몫.
@@ -139,4 +144,4 @@ git log -1 --format='%s' | grep -E "^(feat|fix|docs|refactor|style|chore|test)(\
 
 ---
 
-**VERSION**: 1.6.2 (1.6.1 + 경로 후행 공백 회귀 수정 — git 경로 출력에 .strip() 대신 rstrip("\n") 사용, 공백으로 끝나는 저장소 경로에서 게이트 3종이 비활성화되던 문제 차단)
+**VERSION**: 1.7.0 (1.6.2 + 다중 세션 3대 결함 수정 — ① 세션 종료 병합이 로컬 `main` 을 갱신(`sync_local_main`)해 origin 단독 전진 발산 차단 ② 게이트 진입 판정을 부분문자열→명령위치 파싱(`gw_common.runs_git`)으로 교체해 소유권 장부 오염 차단 ③ `tree-gate` 신설 — 트리 전역 파괴 명령이 타 세션 미커밋 변경을 걷어가는 것 차단)
