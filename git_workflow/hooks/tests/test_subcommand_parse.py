@@ -43,6 +43,17 @@ CASES = [
     ("git log --oneline HEAD..origin/main", ["log"]),
     ("git diff --stat HEAD origin/main", ["diff"]),
     ("git rev-list --count origin/main...HEAD", ["rev-list"]),
+
+    # --- 백슬래시 줄 이음: 한 명령으로 이어져야 한다 ---
+    # (먼저 `\n` 으로 쪼개면 여러 줄 `git add` 가 '파싱 불가'로 차단된다 — 실측 사례)
+    ("git add a.py \\\n    b.py \\\n    c.py", ["add"]),
+    ("git commit -m x \\\n    -- mine.txt", ["commit"]),
+]
+
+# 줄 이음 정규화 — 세그먼트가 쪼개지지 않고 인자가 보존되는지
+CONT = [
+    ("git add a.py \\\n    b.py", 1, ["a.py", "b.py"]),
+    ("git add a.py && git commit -m x", 2, None),
 ]
 
 # runs_git(cmd, *subs) 계약 — 게이트 진입 판정에 쓰이는 형태 그대로
@@ -74,7 +85,18 @@ def main():
         print(("  PASS " if ok else "  FAIL ") + (repr(cmd)[:40] + " " + repr(subs))[:58].ljust(60) +
               "-> " + repr(got) + ("" if ok else "  (기대 %r)" % (want,)))
 
-    total = len(CASES) + len(RUNS)
+    print("=== 줄 이음 정규화 (segments / git_calls) ===")
+    for cmd, nseg, want_args in CONT:
+        segs = gw.segments(cmd)
+        ok = len(segs) == nseg
+        if want_args is not None:
+            args = gw.git_calls(cmd)[0][1] if gw.git_calls(cmd) else []
+            ok = ok and args == want_args
+        fail += 0 if ok else 1
+        print(("  PASS " if ok else "  FAIL ") + repr(cmd)[:58].ljust(60) +
+              "-> 세그먼트 %d" % len(segs) + ("" if ok else "  (기대 %d/%r)" % (nseg, want_args)))
+
+    total = len(CASES) + len(RUNS) + len(CONT)
     print("\n%d/%d 통과, 실패 %d 건" % (total - fail, total, fail))
     return 1 if fail else 0
 

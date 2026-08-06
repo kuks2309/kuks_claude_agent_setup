@@ -62,13 +62,78 @@ def _denied(out):
 
 # ---------- commit-gate: 핵심 차단 ----------
 
-def test_blocks_main_commit_when_other_session_active():
+def _stage_foreign(cwd, name="their.txt"):
+    """타 세션이 소유를 주장하고 index 에 올려둔 파일을 만든다."""
+    _touch_session(cwd, "OTHER", name)
+    with open(os.path.join(cwd, name), "w", encoding="utf-8") as f:
+        f.write("남의 작업\n")
+    _git(cwd, "add", name)
+    return name
+
+
+def test_blocks_bare_commit_that_captures_foreign_staged():
+    """맨몸 `git commit` 은 공유 index 를 통째로 담는다 — 남의 staged 가 있으면 차단."""
     cwd = _init_repo()
     _commit(cwd, "a.txt", "base")
-    _touch_session(cwd, "OTHER", "their.txt")   # 타 세션 활동 중
+    _stage_foreign(cwd)
     out = _run(GATE, cwd, "git commit -m x", "MINE")
-    assert _denied(out), f"공유 트리 main 커밋인데 통과됨: {out.stdout}"
-    assert "session/" in out.stdout, "세션 브랜치 유도 안내가 없음"
+    assert _denied(out), f"남의 staged 를 담는 맨몸 커밋인데 통과됨: {out.stdout}"
+    assert "their.txt" in out.stdout, "담기는 남의 파일을 지목하지 않음"
+
+
+def test_allows_bare_commit_when_nothing_foreign_staged():
+    """타 세션이 활동 중이어도 index 에 남의 것이 없으면 통과 — 커밋은 박제일 뿐이다."""
+    cwd = _init_repo()
+    _commit(cwd, "a.txt", "base")
+    _touch_session(cwd, "OTHER", "their.txt")   # 활동 중이지만 staged 는 아님
+    _touch_session(cwd, "MINE", "mine.txt")
+    with open(os.path.join(cwd, "mine.txt"), "w", encoding="utf-8") as f:
+        f.write("내 작업\n")
+    _git(cwd, "add", "mine.txt")
+    out = _run(GATE, cwd, "git commit -m x", "MINE")
+    assert not _denied(out), f"담기는 남의 것이 없는데 차단됨: {out.stdout}"
+
+
+def test_allows_path_limited_commit_despite_foreign_staged():
+    """경로 한정 커밋은 index 의 나머지를 건드리지 않는다 — 남의 staged 가 있어도 통과."""
+    cwd = _init_repo()
+    _commit(cwd, "a.txt", "base")
+    _stage_foreign(cwd)
+    _touch_session(cwd, "MINE", "mine.txt")
+    with open(os.path.join(cwd, "mine.txt"), "w", encoding="utf-8") as f:
+        f.write("내 작업\n")
+    _git(cwd, "add", "mine.txt")
+    out = _run(GATE, cwd, "git commit -m x -- mine.txt", "MINE")
+    assert not _denied(out), f"경로 한정 커밋인데 차단됨: {out.stdout}"
+
+
+def test_blocks_path_limited_commit_of_foreign_path():
+    """경로 한정이라도 그 경로가 남의 것이면 차단."""
+    cwd = _init_repo()
+    _commit(cwd, "a.txt", "base")
+    _stage_foreign(cwd)
+    out = _run(GATE, cwd, "git commit -m x -- their.txt", "MINE")
+    assert _denied(out), f"남의 경로를 지정했는데 통과됨: {out.stdout}"
+
+
+def test_blocks_commit_all_with_foreign_dirty():
+    """`-a` 는 추적 파일 수정분을 전부 담는다 — 남의 dirty 가 있으면 차단."""
+    cwd = _init_repo()
+    _commit(cwd, "their.txt", "base")           # 추적 상태로 만든 뒤
+    _touch_session(cwd, "OTHER", "their.txt")
+    with open(os.path.join(cwd, "their.txt"), "a", encoding="utf-8") as f:
+        f.write("남의 수정\n")                   # 미스테이지 수정
+    out = _run(GATE, cwd, "git commit -am x", "MINE")
+    assert _denied(out), f"-a 가 남의 수정을 담는데 통과됨: {out.stdout}"
+
+
+def test_message_value_not_treated_as_path():
+    """`-m their.txt` 의 값을 경로로 오인하면 안 된다(스코프 오판)."""
+    cwd = _init_repo()
+    _commit(cwd, "a.txt", "base")
+    _touch_session(cwd, "OTHER", "their.txt")   # staged 는 아님
+    out = _run(GATE, cwd, "git commit -m their.txt", "MINE")
+    assert not _denied(out), f"메시지 값을 경로로 오인해 차단됨: {out.stdout}"
 
 
 def test_allows_main_commit_when_single_session():

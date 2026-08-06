@@ -113,13 +113,25 @@ def test_quoted_cd_path_with_space():
 
 # ---------- 우회 구멍 미발생 (회귀 방지) ----------
 
+def _foreign_staged(cwd, name="their.txt"):
+    """타 세션이 소유를 주장하고 index 에 올려둔 파일 — commit-gate 발동 조건.
+
+    commit-gate 는 '타 세션 활동 중'이 아니라 '이 커밋이 남의 것을 담는가'로 판정하므로,
+    cwd 해석을 시험하려면 실제로 담길 남의 staged 파일이 있어야 한다.
+    """
+    _touch_session(cwd, "OTHER", name)
+    with open(os.path.join(cwd, name), "w", encoding="utf-8") as f:
+        f.write("남의 작업\n")
+    _git(cwd, "add", name)
+
+
 def test_cd_subdir_still_gated():
     """같은 저장소 하위로 cd 해도 게이트가 꺼지면 안 됨 (toplevel 기준 활성화)."""
     proj = _init_repo()
     _commit(proj, "a.txt", "base")
     sub = os.path.join(proj, "docs")
     os.makedirs(sub, exist_ok=True)
-    _touch_session(proj, "OTHER", "their.txt")
+    _foreign_staged(proj)
     out = _run(CGATE, proj, "cd %s && git commit -m x" % sub, "MINE")
     assert _denied(out), "하위 디렉토리 cd 로 게이트가 무력화됨(우회 구멍)"
 
@@ -128,7 +140,7 @@ def test_cd_with_variable_stays_conservative():
     """cd $VAR 는 해석 불가 → 세션 cwd 기준 유지(보수적 deny)."""
     proj = _init_repo()
     _commit(proj, "a.txt", "base")
-    _touch_session(proj, "OTHER", "their.txt")
+    _foreign_staged(proj)
     out = _run(CGATE, proj, "cd $TARGET && git commit -m x", "MINE")
     assert _denied(out), "변수 cd 인데 기준이 바뀜(보수적이어야 함)"
 
@@ -137,7 +149,7 @@ def test_no_cd_unchanged_behavior():
     """cd 없는 명령은 종전과 동일하게 세션 cwd 기준."""
     proj = _init_repo()
     _commit(proj, "a.txt", "base")
-    _touch_session(proj, "OTHER", "their.txt")
+    _foreign_staged(proj)
     out = _run(CGATE, proj, "git commit -m x", "MINE")
     assert _denied(out), "cd 없는 main 커밋은 종전대로 차단돼야 함"
 
@@ -160,7 +172,7 @@ def test_repo_path_with_trailing_space_still_gated():
     os.makedirs(d)
     open(os.path.join(d, "git_workflow.md"), "w").close()
     _commit(proj, "a.txt", "base")
-    _touch_session(proj, "OTHER", "their.txt")
+    _foreign_staged(proj)
     out = _run(CGATE, proj, "git commit -m x", "MINE")
     assert _denied(out), "후행 공백 경로에서 게이트가 비활성화됨(.strip 회귀)"
 
@@ -169,7 +181,7 @@ def test_nonexistent_cd_path_stays_conservative():
     """존재하지 않는 경로로 cd → 기준 유지(보수적)."""
     proj = _init_repo()
     _commit(proj, "a.txt", "base")
-    _touch_session(proj, "OTHER", "their.txt")
+    _foreign_staged(proj)
     out = _run(CGATE, proj, "cd /nonexistent/xyz123 && git commit -m x", "MINE")
     assert _denied(out), "없는 경로 cd 인데 기준이 바뀜(보수적이어야 함)"
 

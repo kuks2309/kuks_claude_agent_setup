@@ -150,7 +150,7 @@ def main():
         return
     touched = touched_set(gd, data.get("session_id") or "unknown")
 
-    for seg in SEG_SEP.split(cmd):
+    for seg in gw.segments(cmd):   # 줄 이음(`\`+개행) 정규화 후 분할
         seg = seg.strip()
         if not seg or "git" not in seg:
             continue

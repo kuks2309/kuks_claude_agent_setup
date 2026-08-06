@@ -39,11 +39,11 @@ push·리뷰 방식이 모드에 갈리므로 **작업 전 먼저 판정**한다
 - **작업 단위 = 커밋 = push 단위** — 서로 다른 scope 변경을 한 커밋에 섞지 않는다. dirty tree 는 scope 별 분할 커밋.
 - **명시 staging (세션 격리)** — `git add <명시 경로>` 만. `git add -A` / `git add .` **금지**. 작업공간을 여러 세션이 공유하면 working tree 에 **타 세션의 미커밋 변경**이 섞일 수 있으므로 **이번 세션이 만든 파일만** staging 한다. commit 직전 `git diff --cached --name-only` 로 staged 범위가 이번 세션 산출물과 일치하는지 검증. 무관한 dirty 파일은 건드리지 않는다(모호하면 1줄 확인).
 - **세션 격리 자동화 (설치 시)** — `hooks/git_workflow-track.py`(PostToolUse) 가 이 세션이 수정한 파일을 `.git/git_workflow/sessions/<session_id>/touched` 에 누적하고, `hooks/git_workflow-reminder.py`(UserPromptSubmit) 가 git 트리거 시 그 목록을 주입한다 → staging 대상이 '이 세션 목록'으로 자동 grounding 된다(`.git` 내부라 비-커밋·세션별 분리). python 부재 시 이 자동화는 생략되고 규칙 텍스트만 생존(수동 식별).
-- **세션 격리 강제 게이트 (⟦CI⟧, 설치 시)** — 네 게이트가 staging·commit·push·트리복원 전 구간을 하드 차단한다. 이로써 아래 §2-1 세션 브랜치가 권고가 아니라 **강제**된다.
+- **세션 격리 강제 게이트 (⟦CI⟧, 설치 시)** — 네 게이트가 staging·commit·push·트리복원 전 구간을 지킨다. 판정 원칙은 **"다른 세션이 살아있는가"가 아니라 "이 명령이 남의 것을 건드리는가"** 다. 내 산출물만 다루는 명령은 동시 세션이 몇이든 통과해야 한다 — 정당한 동작마다 뜨는 게이트는 override 를 반사적으로 붙이게 만들고, 그러면 정작 위험한 명령에도 같이 붙어 게이트가 무력화된다.
   | 게이트 | 시점 | 차단 대상 | override |
   | --- | --- | --- | --- |
   | `hooks/git_workflow-stage-gate.py` | PreToolUse | 타 세션 파일 staging·광역 staging(`-A`/`.`) | `# gw:allow-foreign` |
-  | `hooks/git_workflow-commit-gate.py` | PreToolUse | **타 세션 활동 중 보호 브랜치(`main`/`master`) 직접 커밋** | `# gw:allow-main-commit` |
+  | `hooks/git_workflow-commit-gate.py` | PreToolUse | **커밋이 담게 될 것 중 타 세션 소유가 있을 때** — 맨몸 `commit`(공유 index 통째) · `-a`(남의 dirty 추적분) · 남의 경로 지정 · 남의 커밋 `--amend`. **경로 한정 커밋이 내 파일만 담으면 타 세션 수와 무관하게 통과** | `# gw:allow-main-commit` |
   | `hooks/git_workflow-push-gate.py` | PreToolUse | 타 세션 커밋이 섞인 `main` 직접 push (+ 판정 불가한 첫 push 도 타 세션 활동 시 차단) | `# gw:allow-main-push` |
   | `hooks/git_workflow-tree-gate.py` | PreToolUse | **트리 전역 파괴 명령**(`stash`(경로 미지정)·`reset --hard`·`checkout/restore .`·`clean -f`)이 타 세션 미커밋 변경까지 걷어가는 것 | `# gw:allow-tree-wide` |
 
@@ -61,7 +61,7 @@ push·리뷰 방식이 모드에 갈리므로 **작업 전 먼저 판정**한다
 - `main`(또는 현재 추적 분기) **직접 commit + push**. PR(Pull Request) 미사용.
 - 다중 원격이면: `git push origin main && git push fito main`.
 
-### 2-1. 세션별 브랜치 관례 (solo + 다중 세션 공유 워킹트리 — 훅 설치 시 강제)
+### 2-1. 세션별 브랜치 관례 (solo + 다중 세션 공유 워킹트리 — 이력 격리를 원할 때 선택)
 
 여러 세션(예: 한 창의 다중 탭)이 **같은 저장소·워킹트리·`main` 을 공유**하면, 각 세션 커밋이 공유 `main` 위에 교차되어 이력 추적·동시 push 충돌 관리가 어렵다. 이때 아래 경량 관례를 적용해 세션 산출물을 이력상 격리한다. **solo 모드 선언은 유지**(§0 불변)하되, 각 세션은 `main` 에 직접 push 하지 않고 자기 브랜치로 격리하고, `main` 반영(merge)은 **사용자가 수행**한다.
 
@@ -144,4 +144,6 @@ git log -1 --format='%s' | grep -E "^(feat|fix|docs|refactor|style|chore|test)(\
 
 ---
 
-**VERSION**: 1.7.0 (1.6.2 + 다중 세션 3대 결함 수정 — ① 세션 종료 병합이 로컬 `main` 을 갱신(`sync_local_main`)해 origin 단독 전진 발산 차단 ② 게이트 진입 판정을 부분문자열→명령위치 파싱(`gw_common.runs_git`)으로 교체해 소유권 장부 오염 차단 ③ `tree-gate` 신설 — 트리 전역 파괴 명령이 타 세션 미커밋 변경을 걷어가는 것 차단)
+**VERSION**: 1.8.0 (1.7.0 + commit-gate 를 **스코프 기반**으로 교체 — "타 세션 활동 중 보호 브랜치 커밋 무조건 deny" 에서 "이 커밋이 담게 될 것 중 남의 것이 있을 때만 deny" 로. 경로 한정 커밋은 동시 세션 수와 무관하게 통과하며, §2-1 세션 브랜치는 강제가 아니라 이력 격리를 원할 때의 선택으로 복귀)
+
+1.7.0 (1.6.2 + 다중 세션 3대 결함 수정 — ① 세션 종료 병합이 로컬 `main` 을 갱신(`sync_local_main`)해 origin 단독 전진 발산 차단 ② 게이트 진입 판정을 부분문자열→명령위치 파싱(`gw_common.runs_git`)으로 교체해 소유권 장부 오염 차단 ③ `tree-gate` 신설 — 트리 전역 파괴 명령이 타 세션 미커밋 변경을 걷어가는 것 차단)
