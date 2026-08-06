@@ -97,17 +97,19 @@ sync_local_main(){
     return 0
   fi
 
-  # main 체크아웃 중 — 미커밋 변경이 있으면 ff 가 남의 작업을 흔들 수 있어 보류.
-  if [ -n "$(git -C "$repo" status --porcelain 2>/dev/null)" ]; then
-    err "⚠ 공유 작업트리에 미커밋 변경이 있어 로컬 main fast-forward 보류."
-    err "   origin/main 과 벌어진 채 남습니다. 정리 후: git -C \"$repo\" merge --ff-only origin/main"
-    return 0
-  fi
-  if git -C "$repo" merge --ff-only origin/main -q 2>/dev/null; then
+  # main 체크아웃 중 — **git 자신의 보호에 맡긴다**. ff 가 미커밋 변경을 덮을 상황이면
+  # git 이 거부하고(“Your local changes would be overwritten”), 무관하면 안전하게 전진한다.
+  # dirty 이면 무조건 보류하던 판정은 과했다: 공유 트리에는 타 세션의 **미추적** 파일이
+  # 상시 남아 있어(ff 로 덮일 수 없는 것들) 로컬 main 이 영영 동기화되지 못했다(실측).
+  # `set -e` 주의: 실패하는 명령 치환을 대입문에 쓰면 경고를 내기 전에 스크립트가
+  # 종료된다(실측: ff 거부 시 보류 경고가 조용히 사라졌다). 반드시 조건문 안에서 실행.
+  local out
+  if out="$(git -C "$repo" merge --ff-only origin/main 2>&1)"; then
     say "로컬 main → origin/main 동기화(fast-forward)"
   else
-    err "⚠ 로컬 main fast-forward 실패(발산 가능) — 자동 동기화 보류."
-    err "   확인: git -C \"$repo\" log --oneline origin/main..main"
+    err "⚠ 로컬 main fast-forward 보류 — origin/main 과 벌어진 채 남습니다."
+    err "   git: $(echo "$out" | head -2 | tr '\n' ' ')"
+    err "   해소: 해당 변경을 커밋·정리 후 git -C \"$repo\" merge --ff-only origin/main"
   fi
 }
 
@@ -185,6 +187,9 @@ cmd_end(){
   fi
 
   git -C "$repo" worktree remove --force "$tmp" 2>/dev/null || true
+  # 임시 worktree 의 admin 항목 정리 — 제거가 실패했거나 /tmp 가 먼저 비워지면
+  # `git worktree list` 에 prunable 항목이 계속 쌓인다(실측: 이전 실행분 잔존).
+  git -C "$repo" worktree prune 2>/dev/null || true
 
   if [ "$merged" = 1 ]; then
     local swt; swt="$(worktree_of_branch "$repo" "$branch")"
