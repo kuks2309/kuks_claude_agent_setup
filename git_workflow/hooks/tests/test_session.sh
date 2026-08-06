@@ -105,18 +105,45 @@ run end SESE >/dev/null 2>&1
   && ok local_main_ff || no local_main_ff "로컬 main 이 origin/main 과 불일치(발산)"
 [ -f "$ROOT/repo/e.txt" ] && ok local_worktree_updated || no local_worktree_updated "작업트리에 병합 결과 미반영"
 
-echo "== end (로컬 main 동기화 — dirty → 보류 + 경고) =="
+# 공유 트리에는 타 세션의 미커밋·미추적 파일이 상시 남는다. dirty 이면 무조건 보류하면
+# 로컬 main 이 영영 동기화되지 못한다(실측). 덮어쓸 수 있는 것만 git 이 거부하게 맡긴다.
+echo "== end (로컬 main 동기화 — 무관한 dirty·미추적은 ff 진행) =="
 setup
 run start SESF >/dev/null 2>&1
 WTF="$ROOT/repo-ses-SESF"
 echo "F작업" > "$WTF/f.txt"; git -C "$WTF" add -A; git -C "$WTF" commit -q -m "F work"
-echo "미커밋 편집" >> "$ROOT/repo/file.txt"      # 타 세션이 공유 트리에서 작업 중인 상황
-OUT="$(run end SESF 2>&1)"
-[ "$(git -C "$ROOT/repo" rev-parse main)" != "$(git -C "$ROOT/repo" rev-parse origin/main)" ] \
-  && ok dirty_ff_deferred || no dirty_ff_deferred "dirty 인데 ff 강행(타 세션 작업 위험)"
-echo "$OUT" | grep -q "보류" && ok dirty_warns || no dirty_warns "보류를 조용히 처리(경고 없음)"
+echo "미커밋 편집" >> "$ROOT/repo/file.txt"      # 병합이 건드리지 않는 파일
+echo "미추적" > "$ROOT/repo/untracked.txt"       # ff 로 덮일 수 없는 것
+run end SESF >/dev/null 2>&1
+[ "$(git -C "$ROOT/repo" rev-parse main)" = "$(git -C "$ROOT/repo" rev-parse origin/main)" ] \
+  && ok unrelated_dirty_ff || no unrelated_dirty_ff "무관한 dirty 인데 보류(영영 동기화 안 됨)"
 [ "$(tail -1 "$ROOT/repo/file.txt")" = "미커밋 편집" ] \
   && ok dirty_preserved || no dirty_preserved "타 세션 미커밋 변경이 사라짐"
+[ -f "$ROOT/repo/untracked.txt" ] && ok untracked_preserved || no untracked_preserved "미추적 파일 소실"
+
+echo "== end (로컬 main 동기화 — 덮어쓸 dirty 는 보류 + 경고) =="
+setup
+run start SESF2 >/dev/null 2>&1
+WTF2="$ROOT/repo-ses-SESF2"
+echo "세션이 바꾼 내용" > "$WTF2/file.txt"        # 세션도 file.txt 를 건드리고
+git -C "$WTF2" commit -aq -m "F2 edit file.txt"
+echo "공유 트리 미커밋" >> "$ROOT/repo/file.txt"  # 공유 트리도 같은 파일을 미커밋 수정
+OUT="$(run end SESF2 2>&1)"
+[ "$(git -C "$ROOT/repo" rev-parse main)" != "$(git -C "$ROOT/repo" rev-parse origin/main)" ] \
+  && ok clobbering_ff_deferred || no clobbering_ff_deferred "덮어쓸 dirty 인데 ff 강행"
+echo "$OUT" | grep -q "보류" && ok clobber_warns || no clobber_warns "보류를 조용히 처리(경고 없음)"
+grep -q "공유 트리 미커밋" "$ROOT/repo/file.txt" \
+  && ok clobber_preserved || no clobber_preserved "타 세션 미커밋 변경이 사라짐"
+
+echo "== end (임시 worktree admin 항목 정리) =="
+setup
+run start SESH >/dev/null 2>&1
+echo "H작업" > "$ROOT/repo-ses-SESH/h.txt"
+git -C "$ROOT/repo-ses-SESH" add -A; git -C "$ROOT/repo-ses-SESH" commit -q -m "H work"
+run end SESH >/dev/null 2>&1
+[ "$(git -C "$ROOT/repo" worktree list --porcelain | grep -c '^prunable')" = "0" ] \
+  && ok no_prunable_leftover || no_prunable_leftover_fail=1
+[ -n "${no_prunable_leftover_fail:-}" ] && no no_prunable_leftover "임시 worktree admin 항목 잔존"
 
 echo "== end (로컬 main 동기화 — main 미체크아웃 → ref 갱신) =="
 setup
