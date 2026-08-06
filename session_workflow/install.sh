@@ -157,9 +157,40 @@ echo "✓ 규칙 복사: docs/claude_guideline/$BUNDLE/"
 # 2) CLAUDE.md 등록 (마커로 중복 방지)
 CLAUDE_MD="$TARGET/CLAUDE.md"
 MARKER="kuks_agent_setup:$BUNDLE"
+# python 은 등록 블록 갱신(아래)과 settings.json 훅 등록(§4) 양쪽에서 쓰므로 먼저 해석한다.
+PYBIN=""
+for c in python3 python; do
+  if command -v "$c" >/dev/null 2>&1; then PYBIN="$c"; break; fi
+done
 touch "$CLAUDE_MD"
 if grep -qF "$MARKER" "$CLAUDE_MD"; then
-  echo "• CLAUDE.md 등록 이미 존재 — 스킵"
+  # 등록 블록 = 마커 줄부터 다음 빈 줄·다른 번들 마커·EOF 직전까지(스니펫 = 마커 + 단락 1개).
+  # 그 범위를 현재 claude.snippet.md 로 덮어써, 모델이 매 세션 읽는 규칙 진입점
+  # (CLAUDE.md)의 문구를 규칙 본문과 일치시킨다.
+  if [ -n "${PYBIN:-}" ] && "$PYBIN" - "$CLAUDE_MD" "$SRC/claude.snippet.md" "$MARKER" <<'PYEOF'
+import sys
+md_path, snip_path, marker = sys.argv[1:4]
+lines = open(md_path, encoding="utf-8").read().split("\n")
+snippet = open(snip_path, encoding="utf-8").read().rstrip("\n").split("\n")
+out, i, replaced = [], 0, False
+while i < len(lines):
+    if marker in lines[i] and not replaced:
+        i += 1
+        while i < len(lines) and lines[i].strip() != "" and "kuks_agent_setup:" not in lines[i]:
+            i += 1
+        out += snippet
+        replaced = True
+        continue
+    out.append(lines[i]); i += 1
+if not replaced:
+    sys.exit(1)
+open(md_path, "w", encoding="utf-8").write("\n".join(out))
+PYEOF
+  then
+    echo "✓ CLAUDE.md 등록 갱신(기존 블록 교체)"
+  else
+    echo "• CLAUDE.md 등록 이미 존재 — 갱신 실패, 수동 확인 필요"
+  fi
 else
   printf '\n' >> "$CLAUDE_MD"
   cat "$SRC/claude.snippet.md" >> "$CLAUDE_MD"
@@ -177,10 +208,6 @@ done
 echo "✓ 훅 복사: docs/claude_guideline/$BUNDLE/hooks/"
 
 # 4) settings.json 훅 멱등 등록
-PYBIN=""
-for c in python3 python; do
-  if command -v "$c" >/dev/null 2>&1; then PYBIN="$c"; break; fi
-done
 if [ -z "$PYBIN" ]; then
   echo "⚠ python3/python 없음 — settings.json 훅 등록 건너뜀. 수동 등록 필요."
 else
