@@ -27,11 +27,10 @@ def main():
     touched = ss.read_touched(root, sid)
 
     if meta is not None and touched:
-        top = ss.repo_top(cwd)
-        if top:
-            un = ss.uncommitted(top, touched)
-            if un:
-                ss.write_handoff(root, sid, meta, ss.kst_now_str(), un, touched)
+        # cwd 가 비-git 워크스페이스여도 하위 저장소별로 판정(uncommitted_any).
+        un = ss.uncommitted_any(cwd, touched)
+        if un:
+            ss.write_handoff(root, sid, meta, ss.kst_now_str(), un, touched)
 
     for p in (ss.session_json(root, sid), ss.touched_path(root, sid)):
         try:

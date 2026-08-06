@@ -44,9 +44,6 @@ def recover_stale_handoffs(root, cwd, others):
     기존 handoff 는 덮어쓰지 않는다(픽업 중일 수 있음). 잔류 active 항목은 여기서도
     삭제하지 않는다 — 살아있는 세션 오판 방지(§본 훅 상단 정책).
     """
-    top = ss.repo_top(cwd)
-    if not top:
-        return []
     made = []
     for osid, om in others:
         if not ss.is_stale(om):
@@ -54,7 +51,7 @@ def recover_stale_handoffs(root, cwd, others):
         touched = ss.read_touched(root, osid)
         if not touched:
             continue
-        un = ss.uncommitted(top, touched)
+        un = ss.uncommitted_any(cwd, touched)
         if not un:
             continue
         ended = "%s (비정상 종료 추정 · 시작 훅 복구)" % om.get("last_seen", "?")

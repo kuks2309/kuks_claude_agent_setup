@@ -153,6 +153,39 @@ def main():
     ok("graceful_end_deregistered") if not os.path.isfile(ss.session_json(root, ME)) \
         else no("graceful_end_deregistered", "레지스트리 미해제")
 
+    print("== 비-git 워크스페이스: 하위 저장소별로 미커밋 판정 ==")
+    # 세션은 워크스페이스 루트(비-git)에서 열리고 touched 는 하위 저장소에 걸친다.
+    # repo_top(cwd) 하나로 판정하면 None → 감지가 통째로 꺼져 handoff 가 안 생겼다.
+    ws = tempfile.mkdtemp()
+    d = os.path.join(ws, "docs", "claude_guideline", "session_workflow")
+    os.makedirs(d)
+    open(os.path.join(d, "session_workflow.md"), "w").close()
+    sub = os.path.join(ws, "subrepo")
+    os.makedirs(sub)
+    git(sub, "init", "-q", "-b", "main")
+    git(sub, "config", "user.email", "t@t")
+    git(sub, "config", "user.name", "t")
+    git(sub, "config", "commit.gpgsign", "false")
+    with open(os.path.join(sub, "kept.txt"), "w") as f:
+        f.write("committed\n")
+    git(sub, "add", "-A")
+    git(sub, "commit", "-q", "-m", "init")
+    with open(os.path.join(sub, "orphan.txt"), "w") as f:   # 하위 저장소의 미커밋 산출물
+        f.write("죽은 세션의 작업\n")
+    root = register(ws, DEAD, "워크스페이스 세션", hours_ago=48,
+                    touched_rel=["subrepo/orphan.txt", "subrepo/kept.txt"])
+    register(ws, ME, "내 세션", hours_ago=0, touched_rel=[])
+    run_hook(START, ws, ME)
+    if handoff_exists(root, DEAD):
+        ok("nongit_workspace_recovered")
+        body = open(os.path.join(ss.handoff_dir(root), DEAD + ".md"), encoding="utf-8").read()
+        ok("nongit_lists_only_dirty") if ("subrepo/orphan.txt" in body
+                                          and "subrepo/kept.txt" not in body) \
+            else no("nongit_lists_only_dirty", "커밋된 파일이 섞였거나 미커밋이 빠짐")
+    else:
+        no("nongit_workspace_recovered", "비-git 워크스페이스에서 handoff 미생성")
+        no("nongit_lists_only_dirty", "선행 실패")
+
     print("\n-- 결과: PASS=%d FAIL=%d --" % (PASS, FAIL))
     return 1 if FAIL else 0
 

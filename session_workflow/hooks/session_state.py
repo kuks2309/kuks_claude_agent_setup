@@ -270,6 +270,49 @@ def uncommitted(top, paths):
     return out
 
 
+def _toplevel(d, _cache={}):
+    """디렉터리가 속한 git 저장소 최상위(없으면 None). 디렉터리 단위 캐시."""
+    if d in _cache:
+        return _cache[d]
+    top = None
+    try:
+        r = subprocess.run(["git", "-C", d, "rev-parse", "--show-toplevel"],
+                           capture_output=True, text=True, timeout=5)
+        if r.returncode == 0:
+            top = r.stdout.rstrip("\n")
+    except (OSError, subprocess.SubprocessError):
+        pass
+    _cache[d] = top
+    return top
+
+
+def uncommitted_any(cwd, paths):
+    """cwd 기준 경로 목록 중 미커밋인 것 — **cwd 가 비-git 이어도** 판정한다.
+
+    워크스페이스(비-git) 루트에서 열린 세션은 touched 가 여러 하위 저장소에 걸친다.
+    `repo_top(cwd)` 하나로 판정하면 None 이 되어 미커밋 감지가 통째로 꺼지고, 그러면
+    handoff 도 만들어지지 않는다 — 실제로 비-git 워크스페이스에서는 handoff 가 한 번도
+    생성되지 않았고 종료된 세션의 산출물이 통째로 보이지 않았다.
+
+    경로를 각자의 저장소로 묶어 저장소별 `git status` 로 판정하고, 결과는 입력과 같은
+    표기(cwd 기준)로 돌려준다. 어느 저장소에도 속하지 않는 경로는 판정 대상 밖(제외).
+    """
+    if not paths:
+        return []
+    groups = {}
+    for p in paths:
+        ap = p if os.path.isabs(p) else os.path.join(cwd, p)
+        top = _toplevel(os.path.dirname(ap) or cwd)
+        if not top:
+            continue
+        groups.setdefault(top, []).append((os.path.relpath(ap, top), p))
+    out = []
+    for top, items in groups.items():
+        dirty = set(uncommitted(top, [rel for rel, _ in items]))
+        out += [orig for rel, orig in items if rel in dirty]
+    return out
+
+
 def write_handoff(root, sid, meta, ended, un, touched, overwrite=True, note=None):
     """handoff/<sid>.md 기록. overwrite=False 면 기존 파일을 보존(픽업 중일 수 있음).
 
