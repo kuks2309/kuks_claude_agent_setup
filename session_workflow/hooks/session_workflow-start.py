@@ -33,6 +33,41 @@ def gc_handoffs(root):
             pass
 
 
+def recover_stale_handoffs(root, cwd, others):
+    """비정상 종료로 SessionEnd 를 못 돈 잔류 세션의 미커밋 작업을 handoff 로 박제.
+
+    handoff 는 end 훅에서만 만들어지는데 그 훅은 **정상 종료에서만** 돈다. 크래시·강제
+    종료된 세션의 산출물은 아무 기록도 남지 않아 '누구 것인지 모르는 미커밋 파일'로
+    공유 트리에 남는다 — 실제로 drawio 번들 15파일이 소유 세션 종료 후 미추적으로
+    방치됐고 handoff 폴더는 비어 있었다. 시작 시 그 공백을 메운다.
+
+    기존 handoff 는 덮어쓰지 않는다(픽업 중일 수 있음). 잔류 active 항목은 여기서도
+    삭제하지 않는다 — 살아있는 세션 오판 방지(§본 훅 상단 정책).
+    """
+    top = ss.repo_top(cwd)
+    if not top:
+        return []
+    made = []
+    for osid, om in others:
+        if not ss.is_stale(om):
+            continue
+        touched = ss.read_touched(root, osid)
+        if not touched:
+            continue
+        un = ss.uncommitted(top, touched)
+        if not un:
+            continue
+        ended = "%s (비정상 종료 추정 · 시작 훅 복구)" % om.get("last_seen", "?")
+        note = ("> ⚠ 이 handoff 는 종료 훅이 아니라 **시작 훅이 복구**한 것이다"
+                f"(마지막 활동이 {ss.STALE_HOURS}시간 이상 전).\n"
+                "> 해당 세션이 아직 살아있을 수 있으므로, 픽업 전에 사용자에게 그 세션이"
+                " 끝났는지 확인한다. 살아있으면 픽업하지 말고 이 파일을 그대로 둔다.")
+        if ss.write_handoff(root, osid, om, ended, un, touched,
+                            overwrite=False, note=note):
+            made.append((osid, len(un)))
+    return made
+
+
 def main():
     raw = sys.stdin.read()
     try:
@@ -70,6 +105,12 @@ def main():
                     lines.append(f"    - …외 {len(t) - TOUCHED_SHOW}개")
     else:
         lines.append("다른 활성 세션 없음.")
+
+    # 비정상 종료 세션의 미커밋 산출물을 handoff 로 복구 — 아래 handoff 목록에 바로 뜬다.
+    recovered = recover_stale_handoffs(root, cwd, others)
+    if recovered:
+        lines.append("복구된 handoff(비정상 종료 추정) %d건:" % len(recovered))
+        lines += ["- %s · 미커밋 %d개" % (s[:8], n) for s, n in recovered]
 
     behind = ss.behind_origin_main(cwd)
     if behind:

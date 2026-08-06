@@ -234,7 +234,7 @@ def one_line(text, limit=120):
     return s if len(s) <= limit else s[:limit] + "…"
 
 
-def format_handoff(short, meta, ended, uncommitted, touched):
+def format_handoff(short, meta, ended, uncommitted, touched, note=None):
     lines = [
         f"# 세션 인수인계 · sess:{short}",
         f"- 목적: {one_line(meta.get('purpose') or '(미등록)')}",
@@ -243,7 +243,48 @@ def format_handoff(short, meta, ended, uncommitted, touched):
     ]
     lines += [f"  - {p}" for p in uncommitted]
     lines.append(f"- 이 세션 수정 파일 전체: {len(touched)}개")
+    if note:
+        lines.append("")
+        lines.append(note)
     return "\n".join(lines) + "\n"
+
+
+def uncommitted(top, paths):
+    """touched 중 git 미커밋(작업트리/인덱스 변경·미추적) 파일 목록."""
+    out = []
+    if not paths or not top:
+        return out
+    try:
+        r = subprocess.run(["git", "-C", top, "status", "--porcelain", "--"] + paths,
+                           capture_output=True, text=True, timeout=10)
+        if r.returncode != 0:
+            return out
+        for ln in r.stdout.splitlines():
+            if len(ln) > 3:
+                p = ln[3:].strip().strip('"')
+                if " -> " in p:
+                    p = p.split(" -> ", 1)[1]
+                out.append(p)
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return out
+
+
+def write_handoff(root, sid, meta, ended, un, touched, overwrite=True, note=None):
+    """handoff/<sid>.md 기록. overwrite=False 면 기존 파일을 보존(픽업 중일 수 있음).
+
+    기록했으면 True, 건너뛰거나 실패했으면 False.
+    """
+    hp = os.path.join(handoff_dir(root), sid + ".md")
+    if not overwrite and os.path.exists(hp):
+        return False
+    try:
+        os.makedirs(handoff_dir(root), exist_ok=True)
+        with open(hp, "w", encoding="utf-8") as f:
+            f.write(format_handoff(sid[:8], meta, ended, un, touched, note))
+        return True
+    except OSError:
+        return False
 
 
 def parse_handoff_summary(path):

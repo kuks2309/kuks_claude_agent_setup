@@ -6,33 +6,10 @@
 """
 import json
 import os
-import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import session_state as ss  # noqa: E402
-
-
-def uncommitted(top, paths):
-    """touched 중 git 미커밋(작업트리/인덱스 변경·미추적) 파일 목록."""
-    out = []
-    if not paths:
-        return out
-    try:
-        r = subprocess.run(
-            ["git", "-C", top, "status", "--porcelain", "--"] + paths,
-            capture_output=True, text=True, timeout=10)
-        if r.returncode != 0:
-            return out
-        for ln in r.stdout.splitlines():
-            if len(ln) > 3:
-                p = ln[3:].strip().strip('"')
-                if " -> " in p:
-                    p = p.split(" -> ", 1)[1]
-                out.append(p)
-    except (OSError, subprocess.SubprocessError):
-        pass
-    return out
 
 
 def main():
@@ -52,16 +29,9 @@ def main():
     if meta is not None and touched:
         top = ss.repo_top(cwd)
         if top:
-            un = uncommitted(top, touched)
+            un = ss.uncommitted(top, touched)
             if un:
-                try:
-                    os.makedirs(ss.handoff_dir(root), exist_ok=True)
-                    hp = os.path.join(ss.handoff_dir(root), sid + ".md")
-                    with open(hp, "w", encoding="utf-8") as f:
-                        f.write(ss.format_handoff(
-                            sid[:8], meta, ss.kst_now_str(), un, touched))
-                except OSError:
-                    pass
+                ss.write_handoff(root, sid, meta, ss.kst_now_str(), un, touched)
 
     for p in (ss.session_json(root, sid), ss.touched_path(root, sid)):
         try:
