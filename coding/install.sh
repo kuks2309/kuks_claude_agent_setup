@@ -275,7 +275,17 @@ PYEOF
   fi
 fi
 
-# 6) 설치 기록
+# 6) .clang-format 자동 고정 — C 계열 코드 존재 + 스타일 미선택이면 기본 Allman 생성 (stack.md §1)
+if [ ! -f "$TARGET/.clang-format" ] && \
+   find "$TARGET" -name .git -prune -o -type f \
+     \( -name '*.c' -o -name '*.cc' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \) \
+     -print -quit 2>/dev/null | grep -q .; then
+  printf '# stack.md §1 기본 — Microsoft 스타일(Allman 중괄호 포함). 변경은 ADR + 전체 재포맷 1커밋.\nBasedOnStyle: Microsoft\n' \
+    > "$TARGET/.clang-format"
+  echo "✓ .clang-format 자동 생성(BasedOnStyle: Microsoft — Allman) — 기존 C 계열 전체가 format 검사 대상"
+fi
+
+# 7) 설치 기록
 record_install
 
 echo "완료: $BUNDLE → $TARGET"
