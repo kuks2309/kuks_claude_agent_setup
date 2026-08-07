@@ -89,6 +89,8 @@ flowchart LR
 
 **drawio 동반 (의무) — ①②③ 모든 다이어그램** — 파일 의존 그래프·클래스 관계도·시퀀스 다이어그램은 각각 mermaid 외 **`.drawio`(diagrams.net XML) 파일도 생성**한다: 파일명 `YYYY-MM-DD-file-graph.drawio`(①)·`-class.drawio`(②)·`-sequence.drawio`(③), 루트 정본·패키지 병기 **양쪽**. 형식 `mxGraphModel`(노드=`vertex="1"`+`mxGeometry`, 엣지=`edge="1" source/target=노드id`). **생성 후 검증 의무**: XML well-formed · 엣지 source/target dangling 0 · mermaid ↔ drawio 노드·엣지 1:1 — 검증기 `checks/drawio_validate.py`.
 
+**레이아웃·렌더 품질 검증은 drawio 번들 소관** (사선 화살표·글자 벗어남·박스/엣지 겹침·렌더 시각 검토): `docs/claude_guideline/drawio/drawio.md`. 미설치면 `cd drawio && ./install.sh <타깃>` 후 진행. 위 검증은 위상만 보므로 그림이 보기 흉한 것은 걸러지지 않는다. 특히 **③ 시퀀스**는 같은 참여자 쌍에 메시지가 여러 개라, 경로를 분리(waypoint 또는 서로 다른 `exitY`/`entryY` 앵커)하지 않으면 화살표가 전부 같은 선 위에 겹쳐 그려지고 라벨이 포개진다.
+
 ### ② 클래스 관계도
 
 클래스가 존재하는 코드일 때 **클래스 간 관계**를 UML(Unified Modeling Language) 클래스 다이어그램 스타일로 표시. mermaid `classDiagram` 사용.
@@ -240,7 +242,7 @@ sequenceDiagram
 7. **외부 의존 제외 (상속 예외)** — 외부 라이브러리는 ① 파일 의존 그래프에서 제외. **단 외부 기반 클래스 상속(inherit)은 ② 에 `<<external>>` leaf 로 표기** — 타입 정체성은 핵심 연결
 8. **대형 그래프 분할** — 30 노드 초과 시 `subgraph` 로 디렉토리/패키지 그룹 분할
 9. **이중 기록(루트 정본 + 패키지 병기)** — 루트 `docs/sw_structure/<주제>/` 정본 + `<패키지루트>/docs/sw_structure/<주제>/` 병기(동일 내용). 패키지 루트 특정 불가 시 루트만
-10. **①②③ 모든 다이어그램 drawio 동반 + 검증** — 파일그래프·클래스·시퀀스 각각 mermaid 외 `.drawio` 생성, 노드·엣지(source/target) 검증(dangling 0, mermaid ↔ drawio 1:1). 검증기 `checks/drawio_validate.py`
+10. **①②③ 모든 다이어그램 drawio 동반 + 검증** — 파일그래프·클래스·시퀀스 각각 mermaid 외 `.drawio` 생성, 노드·엣지(source/target) 검증(dangling 0, mermaid ↔ drawio 1:1). 검증기 `checks/drawio_validate.py`. 레이아웃·렌더 품질(사선·글자 벗어남·겹침·시각 검토)은 drawio 번들 소관 → `docs/claude_guideline/drawio/drawio.md`
 
 ---
 

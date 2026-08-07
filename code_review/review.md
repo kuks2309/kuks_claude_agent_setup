@@ -85,6 +85,7 @@ cd code_review && ./install.sh <타깃-프로젝트-루트> [도메인...]
 - 위치: 날짜 파일과 같은 폴더(루트 정본·패키지 병기 **양쪽**)의 `YYYY-MM-DD-flow.drawio` (흐름도 여럿이면 `-flow-<이름>.drawio`).
 - 형식 `mxGraphModel`: **박스** = `<mxCell vertex="1">` + `<mxGeometry x y width height>`, **화살표** = `<mxCell edge="1" source="<박스id>" target="<박스id>">` + `endArrow=classic`.
 - **정확성 검증 의무 (반드시 생성 후 확인·수정)**: ① XML well-formed ② 모든 화살표 `source`/`target` 가 실재 박스 id (dangling 0) ③ mermaid 흐름도의 노드·엣지가 drawio 에 1:1 존재. 검증기 `checks/drawio_validate.py`.
+- **레이아웃·렌더 품질 검증은 drawio 번들 소관** (사선 화살표·글자 벗어남·박스/엣지 겹침·렌더 시각 검토): `docs/claude_guideline/drawio/drawio.md`. 미설치면 `cd drawio && ./install.sh <타깃>` 후 진행. 위상 검증(①②③)만으로는 그림이 보기 흉한 것을 걸러내지 못한다.
 
 ### 3. 함수 리스트 표
 
