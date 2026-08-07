@@ -16,6 +16,20 @@
 | 공통(들여쓰기·줄끝·인코딩) | EditorConfig | `.editorconfig` | LF·UTF-8·스페이스 |
 
 - **선택은 프로젝트 1회 결정 후 고정**(드리프트 금지). 스타일 변경은 ADR(Architecture Decision Record, 설계 결정 기록) + 전체 재포맷 1커밋.
+- **C 계열 기본 중괄호: Allman** — 프로젝트가 아직 스타일을 선택하지 않았다면 `if`/`for`/`while`/`switch`/함수 정의의 여는 중괄호 `{` 는 다음 줄 단독(Allman)을 기본으로 하고, 그 선택을 `.clang-format` 으로 고정한다 (`BasedOnStyle: Microsoft` 가 Allman 중괄호 포함, 최소 지정은 `BreakBeforeBraces: Allman`).
+
+  ```c
+  for (...)
+  {
+      ...
+  }
+
+  if (...)
+  {
+      ...
+  }
+  ```
+
 - 포맷터·설정이 없으면 `format.sh` 는 검사 생략(강제력 0) — 그 환경은 포맷 강제 없음을 정직히 인정.
 
 예) C++ 프로젝트가 Microsoft 스타일을 쓰려면 루트에 `.clang-format` 한 줄:
@@ -77,4 +91,4 @@ bash docs/claude_guideline/coding/checks/format.sh .
 
 ---
 
-**VERSION**: 1.0.0 (포맷터 선택 표 + EditorConfig, format-check 기계 강제 연계; 언어·프레임워크·UI 절은 프로젝트별 작성)
+**VERSION**: 1.1.0 (1.0.0 + C 계열 기본 중괄호 Allman — 스타일 미선택 시 기본값 + `.clang-format` 고정 지시)
