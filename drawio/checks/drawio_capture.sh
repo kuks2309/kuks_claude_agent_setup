@@ -72,24 +72,15 @@ find_drawio() {
 }
 
 install_hint() {
-  cat >&2 <<'EOF'
-✗ drawio 데스크톱을 찾을 수 없습니다. 아래 중 하나로 설치하세요.
+  local sd
+  sd="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" 2>/dev/null && pwd)"
+  cat >&2 <<EOF
+✗ drawio 데스크톱을 찾을 수 없습니다.
 
-  # AppImage (권장 · 루트 불필요)
-  mkdir -p ~/.local/opt/drawio && cd ~/.local/opt/drawio
-  # gh CLI 가 있으면:
-  gh release download --repo jgraph/drawio-desktop \
-     --pattern 'drawio-x86_64-*.AppImage' --dir .
-  # 없으면 (자산명이 drawio-x86_64-<버전>.AppImage 이므로 패턴 주의):
-  curl -fL -o drawio.AppImage "$(curl -fsSL \
-    https://api.github.com/repos/jgraph/drawio-desktop/releases/latest \
-    | grep -o '"browser_download_url": *"[^"]*drawio-x86_64-[^"]*\.AppImage"' \
-    | head -1 | cut -d'"' -f4)"
-  mv -f drawio-x86_64-*.AppImage drawio.AppImage 2>/dev/null
-  chmod +x drawio.AppImage && ln -sf drawio.AppImage drawio
+  설치: bash ${sd:-<번들>/scripts}/setup_env.sh
+        (AppImage ~170MB 를 ~/.local/opt/drawio 에 구성 — 루트 불필요·멱등)
 
-  # 또는 flatpak
-  flatpak install -y flathub com.jgraph.drawio.desktop
+  점검만: bash ${sd:-<번들>/scripts}/setup_env.sh --check
 EOF
 }
 

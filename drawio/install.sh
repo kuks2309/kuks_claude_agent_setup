@@ -2,15 +2,22 @@
 # install.sh — drawio 번들 설치 (코어 + checks + references, 도메인 없음)
 #
 # 사용법:
-#   ./install.sh <타깃-프로젝트-루트>
-#   ./install.sh <타깃-프로젝트-루트> --status   # 설치본 낡음 점검(설치 안 함)
+#   ./install.sh <타깃>              # 파일 배치 + 의존성 설치(scripts/setup_env.sh) + preflight
+#   ./install.sh <타깃> --no-deps    # 의존성 설치 생략(파일 배치만; 테스트/오프라인)
+#   ./install.sh <타깃> --check      # preflight 만 수행(설치 안 함)
+#   ./install.sh <타깃> --status     # 설치본 낡음 점검(설치 안 함)
 #
 # 동작:
 #   1) drawio.md(코어)를 <타깃>/docs/claude_guideline/drawio/ 로 복사
 #   1-b) checks/ 복사 (drawio_lint.py · drawio_capture.sh · fixture)
 #   1-c) references/ 복사 (visual-checklist.md)
+#   1-d) scripts/ 복사 (setup_env.sh)
 #   2) claude.snippet.md 를 <타깃>/CLAUDE.md 에 append (마커 중복방지)
-#   3) 설치 성공 시 <타깃>/docs/claude_guideline/INSTALLED.md 에 자기 행 기록
+#   3) 의존성 설치 — scripts/setup_env.sh (멱등: 있으면 건너뜀)
+#   4) 설치 성공 시 <타깃>/docs/claude_guideline/INSTALLED.md 에 자기 행 기록
+#
+# 의존성 (Layer B 렌더 검증용, Layer A 린트는 의존성 0):
+#   drawio 데스크톱 AppImage(~170MB, 루트 불요) · xvfb · wmctrl/xdotool(루트 필요)
 #
 # --status 판정: 최신(exit 0) / 재설치 권장(exit 1) / 기록 없음(exit 2)
 
@@ -21,9 +28,13 @@ SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 TARGET=""
 STATUS_ONLY=0
+NO_DEPS=0
+CHECK_ONLY=0
 for arg in "$@"; do
   case "$arg" in
-    --status) STATUS_ONLY=1 ;;
+    --status)  STATUS_ONLY=1 ;;
+    --no-deps) NO_DEPS=1 ;;
+    --check)   CHECK_ONLY=1 ;;
     -*) echo "unknown arg: $arg" >&2; exit 64 ;;
     *) TARGET="$arg" ;;
   esac
@@ -34,6 +45,21 @@ done
 DEST="$TARGET/docs/claude_guideline/$BUNDLE"
 RECORD_FILE="$TARGET/docs/claude_guideline/INSTALLED.md"
 INSTALL_ARGS="-"   # 도메인 선택 등 설치 인자 기록(이 번들은 없음)
+[ "$NO_DEPS" = 1 ] && INSTALL_ARGS="--no-deps"
+
+# preflight — Layer A/B 각각 쓸 수 있는 상태인지 보고. 설치하지 않는다.
+preflight() {
+  echo "[PREFLIGHT] drawio"
+  if command -v python3 >/dev/null 2>&1; then
+    echo "  python3 ✓ (Layer A 린트 — 다른 의존성 없음)"
+  else
+    echo "  ✗ python3 없음 — Layer A 린트 불가" >&2
+  fi
+  echo "  --- Layer B (렌더 시각 검증) ---"
+  bash "$SRC/scripts/setup_env.sh" --check 2>&1 | sed 's/^/  /'
+}
+
+[ "$CHECK_ONLY" = 1 ] && { preflight; exit 0; }
 
 # ---- 설치 기록·점검 공통 ----
 
@@ -66,7 +92,7 @@ record_install() {
 drift_pairs() {
   printf '%s\t%s\n' "$SRC/drawio.md" "$DEST/drawio.md"
   local c sub
-  for sub in checks references; do
+  for sub in checks references scripts; do
     [ -d "$SRC/$sub" ] || continue
     for c in "$SRC/$sub/"*; do
       [ -f "$c" ] || continue
@@ -161,6 +187,14 @@ if [ -d "$SRC/references" ]; then
   echo "✓ references 복사: docs/claude_guideline/$BUNDLE/references/"
 fi
 
+# 1-d) scripts/ 복사 (환경 부트스트랩 — 타깃에서 재실행 가능해야 한다)
+if [ -d "$SRC/scripts" ]; then
+  mkdir -p "$DEST/scripts"
+  cp "$SRC"/scripts/* "$DEST/scripts/" 2>/dev/null || true
+  chmod +x "$DEST"/scripts/*.sh 2>/dev/null || true
+  echo "✓ scripts 복사: docs/claude_guideline/$BUNDLE/scripts/"
+fi
+
 # 2) CLAUDE.md 등록 (마커 중복방지)
 CLAUDE_MD="$TARGET/CLAUDE.md"
 MARKER="kuks_agent_setup:$BUNDLE"
@@ -173,18 +207,27 @@ else
   echo "✓ CLAUDE.md 등록 추가"
 fi
 
-# 3) 설치 기록
-record_install
-
-# 4) Layer B(GUI 캡처) 선택 의존성 안내 — 설치를 막지는 않는다
+# 3) 의존성 설치 (Layer B) — 멱등. 실패해도 설치 자체는 성공으로 본다.
 echo
-if [ -f "$HOME/.claude/capture_screen.py" ] && [ -f "$HOME/.claude/computer_action.py" ]; then
-  echo "• Layer B 의존성(computer_use 번들): 확인됨"
+if [ "$NO_DEPS" = 1 ]; then
+  echo "[DEPS] 생략(--no-deps) — Layer B 를 쓰려면 나중에:"
+  echo "       bash $DEST/scripts/setup_env.sh"
 else
-  echo "⚠ Layer B(GUI 캡처)는 computer_use 번들이 전역 설치되어야 동작합니다:"
-  echo "    cd ../computer_use && ./install.sh"
-  echo "  (Layer A 린트는 이 없이도 동작)"
+  echo "[DEPS] Layer B 환경 구성 (없는 것만 설치)"
+  bash "$SRC/scripts/setup_env.sh" 2>&1 | sed 's/^/  /' || \
+    echo "  ⚠ 일부 의존성 미구성 — Layer A 린트는 영향 없음"
 fi
-echo "  GUI 캡처 환경 점검: $DEST/checks/drawio_capture.sh --check"
 
+# GUI 캡처는 computer_use 번들(전역)의 캡처기·입력기를 쓴다
+if [ -f "$HOME/.claude/capture_screen.py" ] && [ -f "$HOME/.claude/computer_action.py" ]; then
+  echo "  ✓ computer_use 번들(GUI 캡처용): 확인됨"
+else
+  echo "  ⚠ computer_use 번들 미설치 — GUI 캡처 불가(--export 는 무관):"
+  echo "      cd ../computer_use && ./install.sh"
+fi
+
+# 4) 설치 기록
+record_install
+echo
+echo "점검: $DEST/checks/drawio_capture.sh --check"
 echo "완료: $BUNDLE → $TARGET"

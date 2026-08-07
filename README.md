@@ -12,6 +12,7 @@ Claude Code 자산(규칙·훅) 설치 저장소. 각 자산은 **폴더별 자�
 | [external_reference/](external_reference/handling.md) | 외부 참조 문서(매뉴얼·datasheet·SDK·표준) 보관·인용·검증 | 프로젝트별 | `cd external_reference && ./install.sh <타깃> [도메인...]` |
 | [code_review/](code_review/review.md) | "코드 리뷰" 인벤토리(목적·함수·전역·의존성) + severity 평가 | 프로젝트별 | `cd code_review && ./install.sh <타깃> [도메인...]` |
 | [sw_structure/](sw_structure/structure.md) | "SW 구조" 파일·클래스 연결 시각화(파일그래프+클래스+시퀀스+연결표) | 프로젝트별 | `cd sw_structure && ./install.sh <타깃>` |
+| [drawio/](drawio/drawio.md) | `.drawio` 다이어그램 품질 2단 검증(기하 린트 L1~L11 + 렌더 시각 검토) | 프로젝트별 | `cd drawio && ./install.sh <타깃>` |
 | [coding/](coding/coding.md) | 코드 작성 SOP(조사→ADR→구현→검증→이중기록) + 이빨 8개(`⟦CI⟧` pre-commit·CI 강제) | 프로젝트별 | `cd coding && ./install.sh <타깃> [도메인...\|--all]` |
 | [debt/](debt/debt.md) | 기술·이해·의도 3-부채 등록·추적 registry (`TODO`↔debt id 강제) | 프로젝트별 | `cd debt && ./install.sh <타깃>` |
 | [issue_fix/](issue_fix/issue_fix.md) | 버그 수정·이슈 해결·빌드 실패 진단→제안→구현→검증→기록 사이클 | 프로젝트별 | `cd issue_fix && ./install.sh <타깃-프로젝트-루트>` |
@@ -30,6 +31,7 @@ Claude Code 자산(규칙·훅) 설치 저장소. 각 자산은 **폴더별 자�
 - **external_reference** — 코어(`handling.md`) + 선택 도메인(`domains/`)을 `docs/claude_guideline/external_reference/` 로 복사 + `CLAUDE.md` 등록. 참조 자료(PDF)는 프로젝트 루트 `references/` 에 별도 보관(docs 와 분리).
 - **code_review** — 코어(`review.md`) + 선택 도메인(`domains/{ros2-review,concurrency,embedded-review}`)을 `docs/claude_guideline/code_review/` 로 복사 + `CLAUDE.md` 등록. 리뷰 산출물은 `docs/code_review/<주제>/YYYY-MM-DD.md`(날짜=버전).
 - **sw_structure** — 코어(`structure.md`)를 `docs/claude_guideline/sw_structure/` 로 복사 + `CLAUDE.md` 등록. 파일 의존 그래프 + 클래스 다이어그램 + 시퀀스 다이어그램 + 연결 관계표 + 구조 관찰(순환·고립). 결함·품질 평가는 `code_review` 소관(본 번들은 연결 시각화만). 산출물 `docs/sw_structure/<주제>/YYYY-MM-DD.md`(날짜=버전).
+- **drawio** — 코어(`drawio.md`) + 검증기(`checks/`) + 체크리스트(`references/`) + 환경 부트스트랩(`scripts/setup_env.sh`)을 `docs/claude_guideline/drawio/` 로 복사 + `CLAUDE.md` 등록. `.drawio` 를 만들거나 고치면 **2단 검증 루프**를 통과해야 완료 선언 가능 — ① 기하 린트 `checks/drawio_lint.py`(L1~L11: 사선 화살표·글자 벗어남·박스/엣지 겹침·축 어긋남·html 태그로 먹힌 글자, 의존성 0·CI 가능) ② 렌더 `checks/drawio_capture.sh`(GUI 창 캡처 또는 `--export`)를 눈으로 검토. 설치 단계가 `setup_env.sh` 로 drawio AppImage(~170MB, 루트 불요)·xvfb·wmctrl/xdotool 을 **없는 것만** 구성(`--no-deps` 로 생략, `--check` 로 점검만). `.drawio` **언제** 만드는지는 code_review·sw_structure 소관, **품질**은 본 번들 소관.
 - **coding** — 코어(`coding.md`·`conventions.md`·`stack.md`) + 선택 도메인(`domains/{ros2-coding,embedded-coding,numeric-coding,concurrency-coding,memory-coding}`) + 이빨(`checks/*.sh`)을 `docs/claude_guideline/coding/` 로 복사 + `CLAUDE.md` 등록 + `.gitignore` 에 `.omc/` 추가. 강제는 `⟦CI:<id>⟧`↔`checks/<id>.sh`(pre-commit·CI), 그 외 `⟦권고⟧`. 코드 양식(함수표·전역변수표) 권위는 `code_review`.
 - **debt** — `debt.md` + 이빨(`checks/*.sh`)을 `docs/claude_guideline/debt/` 로 복사 + registry 템플릿을 `docs/debt/registry.md` 로(기존 보존) + `CLAUDE.md` 등록. 코드 `TODO`/`FIXME`/`HACK` 은 debt id 참조(맨 마커 차단). coding 이 식별, debt 가 등록 권위.
 - **issue_fix** — `issue_fix.md` 를 `docs/claude_guideline/issue_fix/` 로 복사 + `CLAUDE.md` 등록. 진단→제안(승인)→구현→검증→기록 사이클. 기록은 `docs/issues_and_fixes/issues_and_fixes.md`(첫 기록 시 런타임 생성, 승인 불요), SSOT 정규 식별자 강제(변종 `issues_fixes/`·`requirements.md` 금지).

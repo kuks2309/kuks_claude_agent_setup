@@ -3,17 +3,29 @@
 ## 설치
 
 ```bash
-cd drawio && ./install.sh <타깃-프로젝트-루트>
-cd drawio && ./install.sh <타깃-프로젝트-루트> --status   # 설치본 낡음 점검
+cd drawio && ./install.sh <타깃>            # 파일 배치 + 의존성 설치 + preflight
+cd drawio && ./install.sh <타깃> --no-deps  # 의존성 생략(오프라인·테스트)
+cd drawio && ./install.sh <타깃> --check    # preflight 만 (설치 안 함)
+cd drawio && ./install.sh <타깃> --status   # 설치본 낡음 점검
 ```
 
 설치되는 것: 본 규칙 → `docs/claude_guideline/drawio/drawio.md`, 검증기 →
-`docs/claude_guideline/drawio/checks/`, 체크리스트 → `.../references/`,
+`.../checks/`, 체크리스트 → `.../references/`, 환경 부트스트랩 → `.../scripts/`,
 타깃 `CLAUDE.md` 에 등록 줄 append.
 
-Layer B(§4)를 쓰려면 **drawio 데스크톱**이 필요하다. GUI 캡처 방식은 추가로
-**computer_use 번들**(전역)과 X11 디스플레이가, `--export` 방식은 `xvfb` 가
-필요하다. `checks/drawio_capture.sh --check [--export]` 로 점검한다.
+**Layer A(린트)는 python3 외 의존성이 0 이다.** Layer B(렌더 검증)만 아래가
+필요하며, 설치 단계에서 `scripts/setup_env.sh` 가 **없는 것만** 구성한다(멱등).
+
+| 의존성 | 용도 | 설치 |
+| --- | --- | --- |
+| drawio 데스크톱 AppImage | Layer B 양쪽 방식 | `setup_env.sh` 가 `~/.local/opt/drawio` 에 (~170MB, **루트 불요**) |
+| `xvfb` | `--export` 를 디스플레이 없이 | `setup_env.sh` 가 apt (루트 필요, 없으면 안내) |
+| `wmctrl` / `xdotool` | GUI 캡처가 창을 맨 앞으로 | 〃 |
+| computer_use 번들(전역) | GUI 캡처의 캡처기·입력기 | `cd computer_use && ./install.sh` |
+
+나중에 따로 돌리려면 `bash docs/claude_guideline/drawio/scripts/setup_env.sh`
+(`--check` 점검만 · `--force` AppImage 재다운로드). 상태 확인은
+`checks/drawio_capture.sh --check [--export]`.
 
 ## 트리거
 
@@ -280,6 +292,7 @@ python3 checks/drawio_lint.py $(git ls-files '*.drawio') --quiet
 그 SOP 가 정한다 — 코드 리뷰 플로우차트는 code_review, 파일그래프·클래스·시퀀스는
 sw_structure. 본 문서는 **만든 `.drawio` 가 갖춰야 할 품질**만 정한다.
 
-**VERSION**: 1.2.0 (GUI 캡처 경로 실측 수선 — 문서 창 대기·맨앞 올리기·region
+**VERSION**: 1.3.0 (설치 단계가 의존성을 구성 — scripts/setup_env.sh,
+--no-deps/--check 플래그. GUI 캡처 경로 실측 수선 — 문서 창 대기·맨앞 올리기·region
 캡처. L11 신설 — html=1 라벨의 꺾쇠가 태그로 먹혀 글자가 사라지는
 결함. 실사용 렌더 검토에서 발견되어 규칙화)
