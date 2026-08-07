@@ -16,6 +16,7 @@
   L8 그리드·중심축 정렬 (불필요한 계단 꺾임 예방)
   L9 같은 노드쌍 다중 엣지 겹침 (구분 waypoint/앵커 없음)
   L10 무시되는 sourcePoint/targetPoint (source/target 이 있으면 mxGraph 가 버림)
+  L11 html=1 라벨의 <...> 가 태그로 먹혀 글자가 사라짐
 
 사용법:
   drawio_lint.py <file.drawio> [file2.drawio ...]
@@ -140,6 +141,17 @@ def parse_style(style):
 
 
 _TAG_RE = re.compile(r"<[^>]+>")
+
+# html=1 라벨에서 drawio 가 서식으로 해석하는 태그. 이 목록 밖의 `<...>` 는
+# 알 수 없는 태그로 취급돼 화면에서 통째로 사라진다.
+_HTML_OK = {
+    "b", "i", "u", "s", "em", "strong", "strike", "del", "ins", "mark", "small",
+    "sub", "sup", "br", "hr", "p", "div", "span", "font", "a", "img", "code",
+    "pre", "blockquote", "ul", "ol", "li", "dl", "dt", "dd",
+    "table", "thead", "tbody", "tfoot", "tr", "td", "th", "caption", "col",
+    "colgroup", "h1", "h2", "h3", "h4", "h5", "h6", "center", "big", "tt",
+}
+_TAG_NAME_RE = re.compile(r"</?\s*([A-Za-z][\w:-]*)")
 
 
 def plain_text(value, is_html):
@@ -525,6 +537,32 @@ def check_duplicate_edges(cells, problems):
              f"exitX/exitY·entryX/entryY 앵커로 경로를 분리")
 
 
+def check_html_eaten_text(cells, problems):
+    """L11 — html=1 라벨의 `<...>` 가 태그로 먹혀 글자가 사라짐.
+
+    XML 파서가 `&lt;id&gt;` 를 `<id>` 로 되돌린 뒤 drawio 가 html=1 로 렌더하면
+    `<id>` 는 알 수 없는 태그가 되어 화면에서 통째로 사라진다. 위상·기하 검증은
+    전부 통과하므로 글자만 조용히 없어진다. 리터럴 꺾쇠는 `&amp;lt;`/`&amp;gt;`
+    로 이중 이스케이프하거나 html=0 을 쓴다.
+    """
+    for c in sorted(cells.values(), key=lambda v: v.cid):
+        if c.st.get("html") != "1" or not c.value:
+            continue
+        eaten = []
+        for raw in _TAG_RE.findall(c.value):
+            m = _TAG_NAME_RE.match(raw)
+            name = m.group(1).lower() if m else ""
+            if name not in _HTML_OK:
+                eaten.append(raw)
+        if eaten:
+            shown = ", ".join(f"'{t}'" for t in eaten[:4])
+            kind = "엣지" if c.is_edge else "박스"
+            _add(problems, "L11", ERR,
+                 f"{kind} {c.cid}: html=1 라벨의 {shown} 이(가) 태그로 해석돼 "
+                 f"렌더에서 사라짐 — 리터럴 꺾쇠는 &amp;lt; / &amp;gt; 로 "
+                 f"이중 이스케이프하거나 html=0 사용")
+
+
 def check_ignored_points(cells, problems):
     """L10 — source/target 이 있으면 mxGraph 는 sourcePoint/targetPoint 를 버린다.
 
@@ -578,8 +616,10 @@ RULE_TITLE = {
     "L4": "사선 화살표", "L5": "글자 벗어남", "L6": "박스 겹침·간격",
     "L7": "화살표 박스 관통", "L8": "그리드·축 정렬",
     "L9": "엣지 겹침", "L10": "무시되는 고정 좌표",
+    "L11": "html 태그로 먹힌 글자",
 }
-RULE_ORDER = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10"]
+RULE_ORDER = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10",
+              "L11"]
 
 
 def lint_file(path, expect_nodes=None, expect_edges=None):
@@ -609,6 +649,7 @@ def lint_file(path, expect_nodes=None, expect_edges=None):
         check_alignment(cells, local, grid)
         check_duplicate_edges(cells, local)
         check_ignored_points(cells, local)
+        check_html_eaten_text(cells, local)
         if multi:
             local = [(r, lv, f"[{name}] {m}") for r, lv, m in local]
         problems.extend(local)

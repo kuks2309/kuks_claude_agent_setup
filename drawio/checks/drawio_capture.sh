@@ -192,10 +192,17 @@ $DRAWIO --no-sandbox "$FILE_ABS" >/dev/null 2>&1 &
 DRAWIO_PID=$!
 
 # ── 창 등장 대기 (새로 생긴 drawio 창) ────────────────────────────────
+fmt_win(){ printf '%s' "$1" | awk -F'\t' '{printf "%s %sx%s +%s,%s  %s", $1,$4,$5,$2,$3,$6}'; }
+
+# $1: "strict" 면 문서 창(제목에 파일명 또는 "- draw.io")만 인정.
+# drawio(Electron)는 스플래시 창("Flowchart Maker & Online Diagram Software")을
+# 문서 창보다 먼저 띄운다. 스플래시는 아직 배치 전이라 좌표가 (0,0) 이고, 그걸
+# 캡처하면 창이 아니라 화면 원점 영역이 찍힌다. 문서 창이 뜰 때까지 기다린다.
 find_window() {
-  python3 - "$CAPTURE" "$STEM" "$BEFORE_IDS" <<'PY'
+  python3 - "$CAPTURE" "$STEM" "${1:-strict}" "$BEFORE_IDS" <<'PY'
 import json, subprocess, sys
-cap, stem, before = sys.argv[1], sys.argv[2], set(sys.argv[3].split())
+cap, stem, mode = sys.argv[1], sys.argv[2], sys.argv[3]
+before = set(sys.argv[4].split())
 try:
     out = subprocess.run([sys.executable, cap, "--mode", "list"],
                          capture_output=True, text=True, timeout=20).stdout
@@ -212,50 +219,91 @@ def title(w):
     return (w.get("title") or "").lower()
 
 
-# 새 창 중에서도 drawio 앱 창을 고른다: 제목이 "<파일> - draw.io" 형태
-cands = [w for w in fresh if title(w).endswith("draw.io")
-         or title(w).endswith("drawio")]
-if not cands:
-    cands = [w for w in fresh if stem.lower() in title(w)]
-if not cands:                       # 제목이 아직 안 붙은 초기 창은 제외하지 않는다
-    cands = [w for w in fresh if (w.get("w") or 0) >= 400
-             and (w.get("h") or 0) >= 300]
+def big(w):
+    return (w.get("w") or 0) >= 400 and (w.get("h") or 0) >= 300
+
+
+# 문서 창: 제목이 "<파일>.drawio - draw.io" 형태거나 파일명을 담는다
+cands = [w for w in fresh if big(w) and
+         (stem.lower() in title(w) or title(w).endswith("draw.io"))]
+if not cands and mode != "strict":
+    cands = [w for w in fresh if big(w)]      # 마지막 수단: 가장 큰 새 창
 if not cands:
     sys.exit(1)
 w = max(cands, key=lambda w: (w.get("w") or 0) * (w.get("h") or 0))
-print(f"{w['id']}\t{w.get('w')}x{w.get('h')}\t{w.get('title','')}")
+# 배치 전 창(0,0)은 캡처하면 화면 원점이 찍힌다 — 아직 준비 안 된 것으로 본다
+if mode == "strict" and (w.get("x"), w.get("y")) == (0, 0):
+    sys.exit(1)
+print(f"{w['id']}\t{w.get('x')}\t{w.get('y')}\t{w.get('w')}\t{w.get('h')}\t"
+      f"{w.get('title','')}")
 PY
 }
 
 WIN=""
 for _ in $(seq 1 "$WAIT_SEC"); do
   sleep 1
-  WIN="$(find_window || true)"
+  WIN="$(find_window strict || true)"
   [ -n "$WIN" ] && break
 done
+if [ -z "$WIN" ]; then
+  WIN="$(find_window relaxed || true)"   # 문서 창을 못 찾으면 마지막 수단
+  [ -n "$WIN" ] && echo "⚠ 문서 창을 못 찾아 가장 큰 새 창으로 대체: $(fmt_win "$WIN")" >&2
+fi
 if [ -z "$WIN" ]; then
   echo "✗ drawio 창을 찾지 못했습니다 (${WAIT_SEC}s 대기). --wait 를 늘려보세요." >&2
   [ "$KEEP_OPEN" = 1 ] || kill "$DRAWIO_PID" 2>/dev/null
   exit 1
 fi
-WIN_ID="$(printf '%s' "$WIN" | cut -f1)"
-echo "✓ 창: $WIN"
+echo "✓ 창: $(fmt_win "$WIN")"
 sleep 2   # 캔버스 최초 렌더 여유
 
 # ── 화면 정리 (computer-use 키 입력) ──────────────────────────────────
 send_key() { python3 "$ACTION" key --keys "$1" >/dev/null 2>&1 || true; }
 
-# 패널 접기 단축키는 넣지 않는다 — Ctrl+Shift+P 는 데스크톱 WM 이 가로채
-# 창 개요를 띄운다. UI 크롬 없는 이미지가 필요하면 --export 를 쓴다.
+# 창을 실제로 올린다. 데스크톱이 창 개요(Activities/expose) 상태면 창 좌표 자리에
+# 썸네일이 그려져 그 좌표를 캡처해도 개요 화면이 찍힌다 — Escape 로 먼저 빠져
+# 나오고 WM 에 활성화를 요청한다. 좌표 클릭은 개요 상태에서 무의미하다.
+# 패널 접기 단축키(Ctrl+Shift+P)는 제공하지 않는다 — WM 이 가로채 개요를 띄운다.
+# UI 크롬 없는 이미지가 필요하면 --export 를 쓴다.
+raise_window() {
+  local id="$1"
+  if command -v xdotool >/dev/null 2>&1; then
+    xdotool key --clearmodifiers Escape >/dev/null 2>&1 || true
+  fi
+  sleep 0.4
+  if command -v wmctrl >/dev/null 2>&1; then
+    wmctrl -i -a "$id" >/dev/null 2>&1 || true
+  elif command -v xdotool >/dev/null 2>&1; then
+    xdotool windowactivate "$id" >/dev/null 2>&1 || true
+    xdotool windowraise "$id" >/dev/null 2>&1 || true
+  fi
+  sleep 0.8
+}
+
+raise_window "$(printf '%s' "$WIN" | cut -f1)"
 if [ "$DO_FIT" = 1 ]; then
-  python3 "$ACTION" click --x 1 --y 1 >/dev/null 2>&1 || true   # 창 포커스
-  sleep 0.5
   send_key "ctrl+shift+h"    # Fit Page
   sleep 1
 fi
 
 # ── 캡처 ──────────────────────────────────────────────────────────────
-OUT="$(python3 "$CAPTURE" --mode window --window-id "$WIN_ID" \
+# 창 id·좌표를 캡처 직전에 다시 읽는다. 대기 중에 문서 창이 새로 뜨거나
+# 창이 이동·리사이즈되면 앞서 잡은 값이 낡는다.
+WIN_FINAL="$(find_window strict || true)"
+[ -n "$WIN_FINAL" ] && WIN="$WIN_FINAL"
+# 캡처 직전에 다시 맨 앞으로. 재확인에서 창 id 가 바뀌었을 수 있고(문서 창이
+# 늦게 뜨거나 drawio 인스턴스가 여럿인 경우), 대기 중 다른 창이 위로 올라올 수
+# 있다. 가려진 창의 좌표를 캡처하면 그 위에 덮인 창이 찍힌다.
+raise_window "$(printf '%s' "$WIN" | cut -f1)"
+echo "→ 캡처 대상: $(fmt_win "$WIN")"
+# --mode window 는 쓰지 않는다. capture_screen.py 의 창-id 기하 조회는 --mode list
+# 가 주는 좌표와 달라 화면 원점 영역이 찍힌다(실측). list 좌표 + region 이 정확하다.
+WIN_X="$(printf '%s' "$WIN" | cut -f2)"
+WIN_Y="$(printf '%s' "$WIN" | cut -f3)"
+WIN_W="$(printf '%s' "$WIN" | cut -f4)"
+WIN_H="$(printf '%s' "$WIN" | cut -f5)"
+OUT="$(python3 "$CAPTURE" --mode region --left "$WIN_X" --top "$WIN_Y" \
+        --width "$WIN_W" --height "$WIN_H" \
         --project "$PROJECT" --label "drawio-$STEM" 2>&1)"
 echo "$OUT"
 PNG="$(printf '%s' "$OUT" | grep -oE '(/[^ "]+)+\.png' | tail -1)"

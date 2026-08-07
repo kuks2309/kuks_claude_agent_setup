@@ -44,6 +44,7 @@ def test_good_example_has_zero_problems():
     ("bad-L7-through.example.drawio",       set(),  {"L7"}),
     ("bad-L8-jog.example.drawio",           set(),  {"L8"}),
     ("bad-L9-stacked-edges.example.drawio", {"L9"}, {"L10"}),
+    ("bad-L11-eaten-text.example.drawio",   {"L11"}, set()),
 ])
 def test_fixture_triggers_only_its_rule(fixture, expected_err, expected_warn):
     problems, _, _ = lint(fixture)
@@ -88,6 +89,32 @@ def test_L5_wrap_breaks_cjk_without_spaces():
 
 # ── L6 겹침 vs 간격 부족 등급 분리 ────────────────────────────────────
 
+def test_L11_spares_escaped_formatting_and_nonhtml_cells():
+    """이중 이스케이프·서식 태그·html=0 은 렌더에서 멀쩡하므로 적발하지 않는다."""
+    problems, _, _ = lint("bad-L11-eaten-text.example.drawio")
+    msgs = [m for r, _, m in problems if r == "L11"]
+    assert len(msgs) == 1
+    assert "eaten" in msgs[0] and "<id>" in msgs[0]
+    for spared in ("ok_escaped", "ok_formatting", "ok_nohtml"):
+        assert not any(spared in m for m in msgs), f"{spared} 오탐"
+
+
+def test_L11_only_applies_when_html_is_on():
+    """html=0 이면 꺾쇠가 그대로 렌더되므로 결함이 아니다."""
+    cells = {}
+    c = L.Cell("x")
+    c.value = "Vector<T>"
+    c.st = {"html": "0"}
+    c.is_vertex = True
+    cells["x"] = c
+    problems = []
+    L.check_html_eaten_text(cells, problems)
+    assert problems == []
+    c.st = {"html": "1"}
+    L.check_html_eaten_text(cells, problems)
+    assert rules(problems, ERR) == {"L11"}
+
+
 def test_L6_overlap_is_error_but_tight_gap_is_warn():
     problems, _, _ = lint("bad-L6-overlap.example.drawio")
     l6 = [(lv, m) for r, lv, m in problems if r == "L6"]
@@ -97,19 +124,23 @@ def test_L6_overlap_is_error_but_tight_gap_is_warn():
 
 # ── L9/L10: 실제 저장소 예제의 렌더 결함을 잡는가 (회귀 고정) ─────────
 
-def test_repo_sequence_example_stacked_edges_are_caught():
-    """sw_structure/checks/sequence.example.drawio 는 8개 화살표가 겹쳐 그려진다.
+@pytest.mark.parametrize("bundle,name", [
+    ("sw_structure", "sequence.example.drawio"),
+    ("sw_structure", "flow.example.drawio"),
+    ("code_review", "flow.example.drawio"),
+])
+def test_repo_examples_stay_defect_free(bundle, name):
+    """저장소가 배포하는 예제는 결함 0 이어야 한다 — Claude 가 베끼는 원본이므로.
 
-    source/target 이 있으면 mxGraph 가 sourcePoint/targetPoint 를 버리기 때문.
-    위상 전용 검증기(drawio_validate.py)는 이 결함을 통과시킨다.
+    sequence.example.drawio 는 한때 메시지 8개가 같은 선 위에 겹쳐 렌더됐다
+    (source/target 이 있으면 mxGraph 가 sourcePoint/targetPoint 를 버린다).
+    lifeline + exitY/entryY 분리로 수선했고, 본 테스트가 재발을 막는다.
     """
-    path = os.path.join(os.path.dirname(BUNDLE),
-                        "sw_structure", "checks", "sequence.example.drawio")
+    path = os.path.join(os.path.dirname(BUNDLE), bundle, "checks", name)
     if not os.path.exists(path):
         pytest.skip("저장소 예제 없음 (번들 단독 배포본)")
     problems, _, _ = L.lint_file(path)
-    assert "L9" in rules(problems, ERR)
-    assert "L10" in rules(problems, WARN)
+    assert not [p for p in problems if p[1] == ERR], f"{bundle}/{name}: {problems}"
 
 
 # ── 파서 견고성 ───────────────────────────────────────────────────────

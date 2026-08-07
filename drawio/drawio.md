@@ -128,7 +128,23 @@ style="...;exitX=1;exitY=0.25;entryX=0;entryY=0.25;"
 style="...;exitX=1;exitY=0.75;entryX=0;entryY=0.75;"
 ```
 
-### 1-6. `sourcePoint`/`targetPoint` 함정
+### 1-6. `html=1` 에서 꺾쇠는 이중 이스케이프
+
+`html=1` 인 라벨은 XML 디코딩 후 남은 `<...>` 를 **HTML 태그로 해석**한다.
+`value="session/&lt;id&gt;"` 는 `session/<id>` 로 디코딩된 뒤 `<id>` 가 알 수
+없는 태그가 되어 **화면에서 통째로 사라진다**. 위상·기하 검증은 전부 통과하므로
+글자만 조용히 없어진다.
+
+| 쓴 것 | `html` | 렌더 |
+| --- | --- | --- |
+| `session/&lt;id&gt;` | `1` | `session/` — **`<id>` 소실** |
+| `session/&amp;lt;id&amp;gt;` | `1` | `session/<id>` ✓ |
+| `session/&lt;id&gt;` | `0` | `session/<id>` ✓ |
+
+제네릭(`Vector<T>`)·플레이스홀더(`<id>`)·태그명(`<mxCell>`)을 쓸 때 걸린다.
+리터럴 꺾쇠는 `&amp;lt;`/`&amp;gt;` 로 이중 이스케이프하거나 `html=0` 을 쓴다.
+
+### 1-7. `sourcePoint`/`targetPoint` 함정
 
 `source`/`target` 속성이 있으면 mxGraph 는 geometry 의 `sourcePoint`/`targetPoint`
 를 **무시**한다(`mxGraphView.getFixedTerminalPoint` 는 terminal 이 null 일 때만
@@ -167,6 +183,7 @@ python3 checks/drawio_lint.py <file>.drawio --strict        # 경고도 실패 �
 | L8 | 10px 그리드 미정렬 · 중심축 어긋남(<20px, 계단 꺾임) | ⚠ |
 | L9 | 같은 노드쌍 엣지가 구분 없이 겹쳐 그려짐 | ❌ |
 | L10 | `source`/`target` 때문에 무시되는 `sourcePoint`/`targetPoint` | ⚠ |
+| L11 | `html=1` 라벨의 `<...>` 가 태그로 먹혀 글자가 사라짐 | ❌ |
 
 **L5 는 근사다.** 실제 폰트 메트릭이 아니라 Helvetica 폭표 + 전각 1.0em 추정이므로
 경계값에서 틀릴 수 있다. 보수적으로(의심스러우면 적발) 판정하며, **최종 진실은
@@ -200,10 +217,22 @@ done
 | 원격·CI | 불가 | 가능 |
 | 쓸 때 | 편집기에서 실제로 어떻게 보이는지 확인 | 문서에 넣을 그림의 품질 검토 |
 
-**GUI 캡처 동작**: drawio 창을 띄우고 → 실행 전후 창 목록을 비교해 **새로 생긴**
-drawio 창을 찾고(제목만으로 찾으면 파일명·"drawio"를 제목에 담은 편집기 창이
-잡힌다) → `computer_action.py` 로 `Ctrl+Shift+H`(Fit Page) 를 보내고 →
-`capture_screen.py --mode window` 로 캡처하고 → 창을 닫는다.
+**GUI 캡처 동작**: drawio 창을 띄우고 → 실행 전후 창 목록을 비교해 **새로 생긴
+문서 창**을 찾고 → **맨 앞으로 올리고** → `Ctrl+Shift+H`(Fit Page) → 캡처 직전
+창을 **다시 찾아 다시 맨 앞으로** → 그 좌표를 `--mode region` 으로 캡처 → 창을
+닫는다.
+
+각 단계가 실측으로 필요했던 이유:
+
+| 단계 | 안 하면 |
+| --- | --- |
+| 새로 생긴 창만 후보 | 파일명·"drawio"를 제목에 담은 편집기 창이 잡힌다 |
+| **문서 창** 대기 | drawio(Electron)가 먼저 띄우는 스플래시 창(좌표 0,0)을 문다 |
+| **맨 앞으로 올리기** | 가려진 창 좌표를 찍어 위에 덮인 창이 나온다. 데스크톱이 창 개요(Activities) 상태면 썸네일이 찍힌다 |
+| 캡처 직전 **재확인 + 재활성화** | 대기 중 문서 창이 늦게 뜨거나 인스턴스가 여럿이면 올린 창과 찍는 창이 어긋난다 |
+| `--mode region` (창 id 아님) | `capture_screen.py` 의 창-id 기하 조회가 `--mode list` 좌표와 달라 화면 원점이 찍힌다 |
+
+창 앞세우기는 `wmctrl -i -a`(없으면 `xdotool windowactivate`)를 쓴다.
 
 두 방식 모두 마지막 줄 `CAPTURED <경로>` 가 PNG 위치다.
 
@@ -227,9 +256,10 @@ drawio 창을 찾고(제목만으로 찾으면 파일명·"drawio"를 제목에 
 4. 같은 흐름 축 박스는 중심 좌표 일치, 분기는 20px 이상 이격.
 5. 좌표는 10px 그리드, 박스 간 최소 간격 20px.
 6. 같은 노드쌍에 엣지가 여럿이면 waypoint 또는 exit/entry 앵커로 경로 분리.
-7. `source`/`target` 과 `sourcePoint`/`targetPoint` 를 함께 쓰지 않는다.
-8. 디스플레이가 없으면 GUI 캡처 대신 `--export` 를 쓴다. 둘 다 못 했으면 **Layer B 미수행 사실을 산출물에 명시**한다 — 통과로 적지 않는다.
-9. 눈으로 찾은 결함은 가능하면 린트 규칙 + fixture 로 남긴다.
+7. `html=1` 라벨의 리터럴 꺾쇠는 `&amp;lt;`/`&amp;gt;` 로 이중 이스케이프 — 안 하면 글자가 사라진다.
+8. `source`/`target` 과 `sourcePoint`/`targetPoint` 를 함께 쓰지 않는다.
+9. 디스플레이가 없으면 GUI 캡처 대신 `--export` 를 쓴다. 둘 다 못 했으면 **Layer B 미수행 사실을 산출물에 명시**한다 — 통과로 적지 않는다.
+10. 눈으로 찾은 결함은 가능하면 린트 규칙 + fixture 로 남긴다.
 
 ## 자체 점검
 
@@ -250,4 +280,6 @@ python3 checks/drawio_lint.py $(git ls-files '*.drawio') --quiet
 그 SOP 가 정한다 — 코드 리뷰 플로우차트는 code_review, 파일그래프·클래스·시퀀스는
 sw_structure. 본 문서는 **만든 `.drawio` 가 갖춰야 할 품질**만 정한다.
 
-**VERSION**: 1.0.0 (신설 — 2단 검증 루프, 린트 L1~L10, GUI 캡처 시각 검증)
+**VERSION**: 1.2.0 (GUI 캡처 경로 실측 수선 — 문서 창 대기·맨앞 올리기·region
+캡처. L11 신설 — html=1 라벨의 꺾쇠가 태그로 먹혀 글자가 사라지는
+결함. 실사용 렌더 검토에서 발견되어 규칙화)
