@@ -130,7 +130,7 @@ def main():
             os.environ.get("GW_ALLOW_MAIN_PUSH", "").lower() in ("1", "true", "yes"):
         return  # override
 
-    gd = _git(cwd, "rev-parse", "--absolute-git-dir")
+    gd = gw.git_dir(cwd)   # 공유 git-dir — 세션 worktree 도 같은 장부를 본다
     if not gd:
         return
     sid = data.get("session_id") or "unknown"

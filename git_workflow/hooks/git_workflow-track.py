@@ -17,14 +17,20 @@ TRACK_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
 
 
 def git_dir(cwd):
-    """worktree·submodule 안전하게 절대 git-dir 해석. 비-git 이면 None."""
+    """세션 장부를 두는 **공유** git 디렉터리 절대경로. 비-git 이면 None.
+
+    링크드 worktree 에서 `--absolute-git-dir` 은 `.git/worktrees/<name>` 로 갈린다.
+    장부는 메인 트리와 세션 worktree 가 **같은 곳**을 봐야 소유 판정이 성립하므로
+    `--git-common-dir`(둘 다 `.git` 하나로 수렴)을 쓴다.
+    """
     try:
         out = subprocess.run(
-            ["git", "-C", cwd, "rev-parse", "--absolute-git-dir"],
+            ["git", "-C", cwd, "rev-parse", "--git-common-dir"],
             capture_output=True, text=True, timeout=3,
         )
         if out.returncode == 0:
-            return out.stdout.rstrip("\n")  # 경로 후행 공백 보존(.strip 금지)
+            d = out.stdout.rstrip("\n")     # 경로 후행 공백 보존(.strip 금지)
+            return d if os.path.isabs(d) else os.path.abspath(os.path.join(cwd, d))
     except (OSError, subprocess.SubprocessError):
         pass
     return None
@@ -46,14 +52,17 @@ def main():
         return
 
     cwd = data.get("cwd") or os.getcwd()
-    gd = git_dir(cwd)
+    ap = os.path.abspath(path if os.path.isabs(path) else os.path.join(cwd, path))
+    # 장부는 **수정된 파일이 속한 저장소**에 기록한다. 세션 cwd 만 보면 워크스페이스
+    # (비-git) 루트에서 열린 세션은 하위 저장소를 고쳐도 git-dir 해석이 실패해 조용히
+    # 아무것도 남기지 않고, 그 장부에 의존하는 게이트 3종의 소유 판정이 무너진다.
+    gd = git_dir(os.path.dirname(ap)) or git_dir(cwd)
     if not gd:
-        return  # git 저장소 아님 → no-op
+        return  # 파일도 cwd 도 git 저장소 밖 → no-op
 
     session_id = data.get("session_id") or "unknown"
     sess_dir = os.path.join(gd, "git_workflow", "sessions", session_id)
     touched = os.path.join(sess_dir, "touched")
-    ap = os.path.abspath(path)
     try:
         os.makedirs(sess_dir, exist_ok=True)
         existing = set()

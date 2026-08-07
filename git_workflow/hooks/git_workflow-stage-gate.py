@@ -45,11 +45,17 @@ def deny(reason):
 
 
 def git_dir(cwd):
+    """세션 장부를 두는 **공유** git 디렉터리 — 링크드 worktree 도 같은 곳을 본다.
+
+    `--absolute-git-dir` 은 worktree 마다 `.git/worktrees/<name>` 로 갈려 장부가 비어
+    보이고, 그러면 세션 worktree 안의 정당한 staging 이 전부 거부된다.
+    """
     try:
-        out = subprocess.run(["git", "-C", cwd, "rev-parse", "--absolute-git-dir"],
+        out = subprocess.run(["git", "-C", cwd, "rev-parse", "--git-common-dir"],
                              capture_output=True, text=True, timeout=3)
         if out.returncode == 0:
-            return out.stdout.rstrip("\n")  # 경로 후행 공백 보존(.strip 금지)
+            d = out.stdout.rstrip("\n")     # 경로 후행 공백 보존(.strip 금지)
+            return d if os.path.isabs(d) else os.path.abspath(os.path.join(cwd, d))
     except (OSError, subprocess.SubprocessError):
         pass
     return None
