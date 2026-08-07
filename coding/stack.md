@@ -17,6 +17,7 @@
 
 - **선택은 프로젝트 1회 결정 후 고정**(드리프트 금지). 스타일 변경은 ADR(Architecture Decision Record, 설계 결정 기록) + 전체 재포맷 1커밋.
 - **C 계열 기본 중괄호: Allman** — 프로젝트가 아직 스타일을 선택하지 않았다면 `if`/`for`/`while`/`switch`/함수 정의의 여는 중괄호 `{` 는 다음 줄 단독(Allman)을 기본으로 하고, 그 선택을 `.clang-format` 으로 고정한다 (`BasedOnStyle: Microsoft` 가 Allman 중괄호 포함, 최소 지정은 `BreakBeforeBraces: Allman`).
+- **미선택 시 자동 고정 + 전량 검사** — C 계열 코드가 있는 프로젝트에 `.clang-format` 이 없으면 **즉시 기본 파일을 생성해 고정한다**(번들 `install.sh` 가 설치 시 자동 수행, 기존 파일은 절대 덮어쓰지 않음; 설치 후 작업 중 발견해도 동일하게 즉시 생성). 검사 범위는 신규 코드만이 아니라 **기존 C 계열 코드 전체**다 — `checks/format.sh` 가 전량 검사하며, 위반 잔존분의 일괄 재포맷 시점(1커밋)은 사용자가 결정한다.
 
   ```c
   for (...)
@@ -91,4 +92,4 @@ bash docs/claude_guideline/coding/checks/format.sh .
 
 ---
 
-**VERSION**: 1.1.0 (1.0.0 + C 계열 기본 중괄호 Allman — 스타일 미선택 시 기본값 + `.clang-format` 고정 지시)
+**VERSION**: 1.2.0 (1.1.0 + 미선택 시 `.clang-format` 자동 고정(install.sh)·기존 C 계열 전량 검사 명시)
