@@ -12,7 +12,16 @@ fail=0
 ran=0
 
 # C/C++ — .clang-format 있고 clang-format 설치 시
-if [ -f "$TARGET/.clang-format" ] && command -v clang-format >/dev/null 2>&1; then
+# 설정 탐색은 clang-format 과 동일하게 TARGET 에서 상위로 걸어 올라간다
+# (하위 폴더 스코프 실행 시 repo 루트 설정도 인정).
+clang_cfg=""
+_d="$(cd "$TARGET" 2>/dev/null && pwd || dirname "$TARGET")"
+while [ -n "$_d" ]; do
+  [ -f "$_d/.clang-format" ] && { clang_cfg="$_d/.clang-format"; break; }
+  [ "$_d" = "/" ] && break
+  _d="$(dirname "$_d")"
+done
+if [ -n "$clang_cfg" ] && command -v clang-format >/dev/null 2>&1; then
   ran=1
   while IFS= read -r f; do
     [ -n "$f" ] || continue
