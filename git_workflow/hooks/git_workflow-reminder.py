@@ -76,7 +76,10 @@ def mode_section(cwd):
 
 def session_section(cwd, session_id):
     """track 훅이 기록한 '이 세션 수정 파일' 목록을 staging 한정 안내로 변환."""
-    gd = _git(cwd, "rev-parse", "--absolute-git-dir")
+    # 공유 git-dir — 링크드 worktree 의 `.git/worktrees/<name>` 로 갈리면 장부가 비어 보인다.
+    gd = _git(cwd, "rev-parse", "--git-common-dir")
+    if gd and not os.path.isabs(gd):
+        gd = os.path.abspath(os.path.join(cwd, gd))
     if not gd or not session_id:
         return ""
     touched = os.path.join(gd, "git_workflow", "sessions", session_id, "touched")

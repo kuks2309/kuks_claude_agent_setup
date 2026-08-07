@@ -184,4 +184,13 @@ def rule_active(repo):
 
 
 def git_dir(repo):
-    return run_git(repo, "rev-parse", "--absolute-git-dir")
+    """세션 장부(touched·commits)를 두는 **공유** git 디렉터리 절대경로.
+
+    `--absolute-git-dir` 은 링크드 worktree 에서 `.git/worktrees/<name>` 을 가리켜
+    트리마다 장부가 갈린다. 세션 격리 판정은 메인 트리와 세션 worktree 가 **같은 장부**
+    를 봐야 성립하므로 `--git-common-dir` 을 쓴다(둘 다 `.git` 하나로 수렴).
+    """
+    d = run_git(repo, "rev-parse", "--git-common-dir")
+    if d is None:
+        return None
+    return d if os.path.isabs(d) else os.path.abspath(os.path.join(repo, d))
