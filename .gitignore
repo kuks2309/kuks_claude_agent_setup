@@ -2,3 +2,7 @@
 __pycache__/
 docs/user_instructions/sessions/
 *.bak
+*.lock
+.vscode/browse.vc.db
+*.vc.db
+.vscode/
