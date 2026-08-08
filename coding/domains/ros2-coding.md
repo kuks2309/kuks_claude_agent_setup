@@ -8,6 +8,8 @@ ROS2 코드를 쓰면 활성, 아니면 면제:
 
 - `package.xml` · `rclpy`/`rclcpp` · `*.launch.py` · `rcl_interfaces` · `.msg`/`.srv`/`.action`
 
+**§5(기동 규율)는 별도 트리거** — 코드 작성 여부와 무관하게 **노드를 기동·시험·실기 구동할 때** 활성한다 (`ros2 launch` / `ros2 run` 실행, SIL/HIL 시험, 성능 측정, 실기 주행·시연). 작성 트리거가 0건이어도 구동하면 §5 는 적용된다.
+
 ## 1. QoS (Quality of Service) 일치
 
 - **pub↔sub QoS 호환 필수** — 불일치 시 통신 두절(메시지 0). reliability(reliable/best-effort)·durability·history depth 를 맞춘다.
@@ -64,6 +66,8 @@ grep -rEl 'rclpy|rclcpp|package\.xml|\.launch\.py' . >/dev/null 2>&1 \
 
 ---
 
-**VERSION**: 1.1.0 (1.0.0 + §5 실기·시험 기동 규율 신설 — 중복 판정을 노드이름ⓐ+토픽발행자ⓑ 2축으로(remap 시 이름 대조 실패), 전량 종료 금지, 고정 절차 기동(다중 런치 허용·절차 밖 `ros2 run` 금지), 계층 얹기는 개발·디버그 한정·측정 보고 금지; 실사격 2026-08-02 발행자 2개 측정 무효 사례 근거)
+**VERSION**: 1.1.1 (1.1.0 + §5 별도 트리거 명시 — 작성 트리거 0건이어도 기동·실기 구동 시 활성)
+
+1.1.0 (1.0.0 + §5 실기·시험 기동 규율 신설 — 중복 판정을 노드이름ⓐ+토픽발행자ⓑ 2축으로(remap 시 이름 대조 실패), 전량 종료 금지, 고정 절차 기동(다중 런치 허용·절차 밖 `ros2 run` 금지), 계층 얹기는 개발·디버그 한정·측정 보고 금지; 실사격 2026-08-02 발행자 2개 측정 무효 사례 근거)
 
 1.0.0 (QoS 일치 + 콜백 starvation/callback group + 파라미터·수명주기 + frame/인터페이스 ADR; concurrency·numeric cross-ref; ros2-review 와 write↔review 상보)
