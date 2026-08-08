@@ -251,9 +251,9 @@ sleep 2   # 캔버스 최초 렌더 여유
 # ── 화면 정리 (computer-use 키 입력) ──────────────────────────────────
 send_key() { python3 "$ACTION" key --keys "$1" >/dev/null 2>&1 || true; }
 
-# 창을 실제로 올린다. 데스크톱이 창 개요(Activities/expose) 상태면 창 좌표 자리에
-# 썸네일이 그려져 그 좌표를 캡처해도 개요 화면이 찍힌다 — Escape 로 먼저 빠져
-# 나오고 WM 에 활성화를 요청한다. 좌표 클릭은 개요 상태에서 무의미하다.
+# Fit Page 키가 drawio 창에 닿으려면 그 창이 활성이어야 한다. 좌표 클릭으로는
+# 부족하므로 WM 에 활성화를 요청한다. (캡처 시점의 창 올리기는 capture_screen.py
+# 의 --mode window 가 xdotool windowactivate --sync 로 직접 한다.)
 # 패널 접기 단축키(Ctrl+Shift+P)는 제공하지 않는다 — WM 이 가로채 개요를 띄운다.
 # UI 크롬 없는 이미지가 필요하면 --export 를 쓴다.
 raise_window() {
@@ -282,19 +282,10 @@ fi
 # 창이 이동·리사이즈되면 앞서 잡은 값이 낡는다.
 WIN_FINAL="$(find_window strict || true)"
 [ -n "$WIN_FINAL" ] && WIN="$WIN_FINAL"
-# 캡처 직전에 다시 맨 앞으로. 재확인에서 창 id 가 바뀌었을 수 있고(문서 창이
-# 늦게 뜨거나 drawio 인스턴스가 여럿인 경우), 대기 중 다른 창이 위로 올라올 수
-# 있다. 가려진 창의 좌표를 캡처하면 그 위에 덮인 창이 찍힌다.
-raise_window "$(printf '%s' "$WIN" | cut -f1)"
 echo "→ 캡처 대상: $(fmt_win "$WIN")"
-# --mode window 는 쓰지 않는다. capture_screen.py 의 창-id 기하 조회는 --mode list
-# 가 주는 좌표와 달라 화면 원점 영역이 찍힌다(실측). list 좌표 + region 이 정확하다.
-WIN_X="$(printf '%s' "$WIN" | cut -f2)"
-WIN_Y="$(printf '%s' "$WIN" | cut -f3)"
-WIN_W="$(printf '%s' "$WIN" | cut -f4)"
-WIN_H="$(printf '%s' "$WIN" | cut -f5)"
-OUT="$(python3 "$CAPTURE" --mode region --left "$WIN_X" --top "$WIN_Y" \
-        --width "$WIN_W" --height "$WIN_H" \
+# capture_screen.py --mode window 가 xdotool windowactivate --sync 로 창을 올린 뒤
+# xwininfo 절대좌표로 잡는다 — 여기서 좌표를 따로 넘기지 않는다.
+OUT="$(python3 "$CAPTURE" --mode window --window-id "$(printf '%s' "$WIN" | cut -f1)" \
         --project "$PROJECT" --label "drawio-$STEM" 2>&1)"
 echo "$OUT"
 PNG="$(printf '%s' "$OUT" | grep -oE '(/[^ "]+)+\.png' | tail -1)"
