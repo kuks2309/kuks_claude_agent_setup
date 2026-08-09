@@ -50,7 +50,7 @@ cd coding && ./install.sh <타깃-프로젝트-루트> [도메인...|--all]
 
 - `Write`/`Edit`/`MultiEdit`/`NotebookEdit` 대상이 코드 파일이면, 그 파일을 등재한 표를 이번 세션에 읽었는지 검사하고 미독이면 도구 호출을 거부한다(`PostToolUse(Read)` 가 읽은 파일을 세션별로 기록).
 - 요구하는 표는 **최근접 조상 모듈의 것**이다 — 표는 모듈 로컬(권위) + 루트 집계로 이중 기록되므로 권위본을 읽게 한다. 등재 판정은 표의 위치 컬럼 형식(`backend.py:315-349`)에 맞춘 `파일명:줄` 앵커이며, `docs/claude_guideline/**`(설치된 규칙 문서)는 표 후보에서 제외한다.
-- 표가 아예 없으면 **통과**가 기본값이다(인벤토리 미도입 프로젝트를 전면 차단하면 훅이 꺼져 강제력이 0 으로 회귀한다). 위 "표가 없으면 먼저 만든다"를 기계로 강제하려면 `CODING_GATE=strict`.
+- **표가 아예 없어도 차단한다** — 위 "표가 없으면 먼저 만든다"를 기계로 강제한다. 초기 구현은 "인벤토리 미도입 프로젝트에서 훅이 꺼질까 봐" 통과를 기본값으로 뒀는데, 실측 결과 **코드의 82%가 표 없이 무방비로 지나가며 부채를 쌓고 있었다**(Big-AMR 983개 중 등재 180개, 세션 14개 중 8개가 표를 한 번도 안 읽음). 운영 걱정으로 규칙을 약화하지 않는다. 완화가 필요하면 `CODING_GATE=lenient`(표 없는 파일 통과) — 명시적이라 흔적이 남는다.
 - 오탐 우회는 사용자 승인 후 `.allow` 파일 또는 `CODING_GATE_SKIP=1`. 동작 검증은 `tests/inventory-gate.test.sh`.
 - **표 행은 훅이 직접 실어 나른다** — 경로만 알려주면 3만 바이트 표에서 그 행을 못 찾고 지나친다(실사격 오판의 직접 형태가 '표는 있었는데 그 행을 안 봤다'였다). `coding-reminder.py` 가 **계획 전**에 프롬프트 심볼의 행을, 게이트가 **수정 직전**에 대상 파일의 행을 각각 보여준다. 정렬은 이번 수정/프롬프트의 식별자와 **단어 경계** 일치하는 행 우선, 표 행이 산문보다 우대. 검증은 `tests/reminder-inject.test.sh`.
 
@@ -134,4 +134,4 @@ test "$(grep -cE '^[0-9]+\. ' docs/claude_guideline/coding/coding.md)" -le 7 || 
 
 ---
 
-**VERSION**: 1.1.0 (CI 재도출 척추 + 작성 규율 advisory + never-self-approve 헌법 + trivial fast-path; 강제 태그 ⟦CI⟧/⟦훅⟧/⟦권고⟧ 3분류; 강제 로직은 checks/*.sh·hooks/*.py 위임; §2 함수표 선독을 inventory-gate 훅이 시점 차단 — 최근접 조상 모듈 표 + `파일명:줄` 앵커, 실사격 저장소 실측 확정; self-contained·OMC-free)
+**VERSION**: 1.2.0 (CI 재도출 척추 + 작성 규율 advisory + never-self-approve 헌법 + trivial fast-path; 강제 태그 ⟦CI⟧/⟦훅⟧/⟦권고⟧ 3분류; 강제 로직은 checks/*.sh·hooks/*.py 위임; §2 함수표 선독을 inventory-gate 훅이 시점 차단 — 최근접 조상 모듈 표 + `파일명:줄` 앵커, 실사격 저장소 실측 확정; self-contained·OMC-free; **표 부재 시 차단이 기본값** — §2 "표가 없으면 먼저 만든다"의 기계 강제, 완화는 CODING_GATE=lenient)
