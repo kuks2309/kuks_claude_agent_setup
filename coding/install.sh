@@ -237,11 +237,14 @@ if [ -d "$SRC/hooks" ]; then
     HOOK_BASE="$PYBIN \"\$CLAUDE_PROJECT_DIR/docs/claude_guideline/$BUNDLE/hooks"
     REMIND_CMD="$HOOK_BASE/$BUNDLE-reminder.py\""
     GATE_CMD="$HOOK_BASE/$BUNDLE-inventory-gate.py\""
-    "$PYBIN" - "$SETTINGS" "$REMIND_CMD" "$GATE_CMD" \
+    RECORD_CMD="$HOOK_BASE/$BUNDLE-record-gate.py\""
+    "$PYBIN" - "$SETTINGS" "$REMIND_CMD" "$GATE_CMD" "$RECORD_CMD" \
               "$([ -f "$SRC/hooks/$BUNDLE-reminder.py" ] && echo 1 || echo 0)" \
-              "$([ -f "$SRC/hooks/$BUNDLE-inventory-gate.py" ] && echo 1 || echo 0)" <<'PYEOF'
+              "$([ -f "$SRC/hooks/$BUNDLE-inventory-gate.py" ] && echo 1 || echo 0)" \
+              "$([ -f "$SRC/hooks/$BUNDLE-record-gate.py" ] && echo 1 || echo 0)" <<'PYEOF'
 import json, sys
-settings_path, remind, gate, has_remind, has_gate = sys.argv[1:6]
+(settings_path, remind, gate, record,
+ has_remind, has_gate, has_record) = sys.argv[1:8]
 try:
     with open(settings_path, encoding="utf-8") as f:
         cfg = json.load(f)
@@ -268,6 +271,9 @@ if has_gate == "1":
         "PreToolUse", gate, 10, matcher="Write|Edit|MultiEdit|NotebookEdit"))
     msg.append("PostToolUse(read-track)=" + ensure(
         "PostToolUse", gate, 5, matcher="Read"))
+if has_record == "1":
+    # Stop — §6 표 갱신 확인. ⟦CI:index-fresh⟧ 는 커밋 시점이라 커밋 없는 턴이 빈다.
+    msg.append("Stop(record-gate)=" + ensure("Stop", record, 10))
 with open(settings_path, "w", encoding="utf-8") as f:
     json.dump(cfg, f, ensure_ascii=False, indent=2)
 print("✓ settings.json 훅 등록: " + ", ".join(msg))

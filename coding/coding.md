@@ -20,7 +20,7 @@ cd coding && ./install.sh <타깃-프로젝트-루트> [도메인...|--all]
 진짜 인터록은 **코드에서 재도출(re-derive)되는 것뿐**이다. 모든 규칙에 강제 태그를 단다:
 
 - **`⟦CI:<id>⟧`** = `checks/<id>.sh` 가 커밋된 코드로부터 결정론적으로 재도출·차단(pre-commit·CI). **에이전트가 못 속인다.** (현재 `<id>` ∈ {index-fresh, dup-signature, tests-ran, banned-pattern, adr-fields})
-- **`⟦훅:<id>⟧`** = `hooks/coding-<id>.py` 가 **도구 호출 시점에 차단**(Claude Code 훅). 사후 재도출이 아니라 사전 차단이라 **하려던 작업 자체가 막힌다.** 자기보고에 의존하지 않으므로 advisory 가 아니다. 한계는 정직하게: 훅 미설치 환경(설정 미등록·타 에이전트)에서는 강제력 0 이고, 우회 경로(`CODING_GATE_SKIP=1`·`.allow` 파일)가 열려 있다 — 다만 우회는 **명시적이라 흔적이 남는다**. (현재 `<id>` ∈ {inventory-gate})
+- **`⟦훅:<id>⟧`** = `hooks/coding-<id>.py` 가 **도구 호출 시점에 차단**(Claude Code 훅). 사후 재도출이 아니라 사전 차단이라 **하려던 작업 자체가 막힌다.** 자기보고에 의존하지 않으므로 advisory 가 아니다. 한계는 정직하게: 훅 미설치 환경(설정 미등록·타 에이전트)에서는 강제력 0 이고, 우회 경로(`CODING_GATE_SKIP=1`·`.allow` 파일)가 열려 있다 — 다만 우회는 **명시적이라 흔적이 남는다**. (현재 `<id>` ∈ {inventory-gate, record-gate})
 - **`⟦권고⟧`** = 코드 재도출도 시점 차단도 불가. 에이전트 자기보고에 의존하므로 **정직하게 advisory**. (태그 없는 체크박스는 전부 `⟦권고⟧`.)
 
 핵심 명제 세 줄:
@@ -91,6 +91,7 @@ kill-test("이 트리거가 없으면 무슨 사고가 나는가" 답 가능) �
 
 - **상태-미러형**(함수표·변수표·flowchart·인덱스): 덮어쓰기. **이중 기록** = 모듈 로컬(권위) + 루트 집계. 인덱스 stale 시 차단 `⟦CI:index-fresh⟧`
 - 폐루프의 양끝이 모두 기계로 막혀 있다 — 여기(write)는 `⟦CI:index-fresh⟧`(커밋 시), §2(read)는 `⟦훅:inventory-gate⟧`(수정 시). 내가 여기서 갱신해야 다음 작업이 §2 에서 최신 표를 읽고, §2 에서 읽어야 애초에 코드를 고칠 수 있다.
+- **턴 종료 시 표 갱신을 마주친다** `⟦훅:record-gate⟧` — `⟦CI:index-fresh⟧` 는 커밋 시점 검사라 **커밋하지 않는 턴에서는 표 갱신이 강제되지 않는다.** 그 구간이 비면 갱신이 "코드 다 끝내고 나중에"로 미뤄지고 그대로 남지 않는다(실사격 실패의 자백이 정확히 이 형태였다). 이번 턴에 고친 코드의 커버 표를 같은 턴에 고쳤는지 Stop 시점에 확인하고, 아니면 종료를 1회 막아 대면시킨다. **인터페이스가 그대로인 내부 로직 수정은 갱신 불요**이므로 훅은 판정하지 않고 예외를 안내만 한다 — 대면은 강제하되 판단은 모델이 한다.
 - **로그-누적형**(ADR·수정이력): append / supersede(덮어쓰기 금지, 기존은 `Status: Superseded`)
 - 미해결 **이해·의도 부채**는 `debt` 번들에 등록(위임 — coding 은 '식별'만; **`debt` 미설치 시 식별만 주석/ADR 에 남김, 무해**) `⟦권고⟧`
 
@@ -120,6 +121,7 @@ grep -oE '⟦(CI|훅):[a-z-]+⟧' docs/claude_guideline/coding/coding.md | sort 
 
 # 인벤토리 게이트 동작 검증 (설치본에서 재실행 가능 — 선언만 하고 검증 안 하는 실패 방지)
 bash docs/claude_guideline/coding/tests/inventory-gate.test.sh
+bash docs/claude_guideline/coding/tests/record-gate.test.sh
 
 # MUST 예산 (룰 요약 항목 ≤ 7)
 test "$(grep -cE '^[0-9]+\. ' docs/claude_guideline/coding/coding.md)" -le 7 || echo "MUST 예산 초과"
@@ -134,4 +136,4 @@ test "$(grep -cE '^[0-9]+\. ' docs/claude_guideline/coding/coding.md)" -le 7 || 
 
 ---
 
-**VERSION**: 1.2.0 (CI 재도출 척추 + 작성 규율 advisory + never-self-approve 헌법 + trivial fast-path; 강제 태그 ⟦CI⟧/⟦훅⟧/⟦권고⟧ 3분류; 강제 로직은 checks/*.sh·hooks/*.py 위임; §2 함수표 선독을 inventory-gate 훅이 시점 차단 — 최근접 조상 모듈 표 + `파일명:줄` 앵커, 실사격 저장소 실측 확정; self-contained·OMC-free; **표 부재 시 차단이 기본값** — §2 "표가 없으면 먼저 만든다"의 기계 강제, 완화는 CODING_GATE=lenient)
+**VERSION**: 1.3.0 (CI 재도출 척추 + 작성 규율 advisory + never-self-approve 헌법 + trivial fast-path; 강제 태그 ⟦CI⟧/⟦훅⟧/⟦권고⟧ 3분류; 강제 로직은 checks/*.sh·hooks/*.py 위임; §2 함수표 선독을 inventory-gate 훅이 시점 차단 — 최근접 조상 모듈 표 + `파일명:줄` 앵커, 실사격 저장소 실측 확정; self-contained·OMC-free; **표 부재 시 차단이 기본값** — §2 "표가 없으면 먼저 만든다"의 기계 강제, 완화는 CODING_GATE=lenient; §6 표 갱신은 Stop 훅 record-gate 가 턴마다 대면)
