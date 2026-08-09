@@ -130,6 +130,16 @@ cmd_start(){
     err "이미 존재: $branch"; local ex; ex="$(worktree_of_branch "$repo" "$branch")"
     [ -n "$ex" ] && echo "$ex"; exit 0
   fi
+  # 경로에 남은 잔재 회수 — worktree 로 등록돼 있지 않고 **점(.)으로 시작하는 항목만**
+  # 들어 있으면 도구가 만든 캐시(예: .omc/)뿐이므로 안전하게 치운다. 이 잔재를 그대로
+  # 두면 worktree 생성이 경로 선점으로 실패한다. 실제 파일이 하나라도 있으면 손대지 않는다.
+  if [ -e "$wt" ] && [ -z "$(worktree_of_branch "$repo" "$branch")" ] && \
+     ! git -C "$repo" worktree list --porcelain | grep -qxF "worktree $wt"; then
+    if [ -d "$wt" ] && [ -z "$(find "$wt" -mindepth 1 -maxdepth 1 ! -name '.*' 2>/dev/null)" ]; then
+      rm -rf "$wt" && say "경로 잔재 회수: $wt (도구 캐시만 있어 제거)"
+    fi
+  fi
+
   local base; base="$(merge_base_ref "$repo")"
   # 생성 실패 시 브랜치만 남는 경우가 있다(예: 경로에 이전 실행의 디렉터리가 잔존).
   # 그대로 두면 다음 start 가 '이미 존재'로 막히므로, 만들어진 브랜치를 되돌린다.

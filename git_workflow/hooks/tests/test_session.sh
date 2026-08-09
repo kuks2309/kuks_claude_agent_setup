@@ -168,6 +168,24 @@ echo "$OUT" | grep -q "worktree 생성 실패" && ok start_fail_reported || no s
 git -C "$ROOT/repo" show-ref --verify --quiet refs/heads/session/SESX \
   && no start_fail_no_dangling_branch "잔여 브랜치 session/SESX 남음" || ok start_fail_no_dangling_branch
 
+echo "== 경로에 도구 캐시만 남아 있으면 회수하고 진행한다 =="
+setup
+WTR="$ROOT/repo-ses-SESR"
+mkdir -p "$WTR/.omc/observations"; echo cache > "$WTR/.omc/patterns.md"   # 다른 도구가 만든 잔재
+OUT="$(run start SESR 2>&1)"; rc=$?
+[ "$rc" = 0 ] && ok reclaim_exit0 || no reclaim_exit0 "회수 가능한 잔재인데 exit=$rc"
+echo "$OUT" | grep -q "경로 잔재 회수" && ok reclaim_reported || no reclaim_reported "회수를 알리지 않음"
+git -C "$ROOT/repo" show-ref --verify --quiet refs/heads/session/SESR \
+  && ok reclaim_branch_created || no reclaim_branch_created "브랜치 미생성"
+
+echo "== 실제 파일이 있으면 회수하지 않고 실패한다 =="
+setup
+WTK="$ROOT/repo-ses-SESK"
+mkdir -p "$WTK"; echo "사람이 둔 파일" > "$WTK/keep.txt"
+OUT="$(run start SESK 2>&1)"; rc=$?
+[ "$rc" != 0 ] && ok keep_exit_nonzero || no keep_exit_nonzero "실제 파일이 있는데 exit=$rc"
+[ -f "$WTK/keep.txt" ] && ok keep_file_preserved || no keep_file_preserved "사용자 파일이 삭제됨"
+
 echo "== end 성공 시 디렉터리까지 실제로 사라진다 =="
 setup
 run start SESY >/dev/null 2>&1
