@@ -118,10 +118,13 @@ def main():
     rels = [r for r in (g.rel_to(base, p) for p in edited) if r]
     touched = set(rels)
 
-    stale = []
+    logged = any("code_updates/" in r.replace(os.sep, "/") for r in rels)
+
+    stale, edited_code = [], []
     for rel in rels:
         if os.path.splitext(rel)[1].lower() not in g.CODE_EXT:
             continue                   # 코드 파일만 대상
+        edited_code.append(rel)
         tables = g.covering_tables(base, rel)
         if not tables:
             continue                   # 표 부재는 PreToolUse 게이트 소관 — 이중 경보 금지
@@ -129,22 +132,36 @@ def main():
             continue                   # 같은 턴에 표를 고쳤다
         stale.append((rel, tables))
 
-    if not stale:
+    if not stale and (logged or not edited_code):
         return 0
 
-    listed = "\n".join(
-        f"  · {rel}\n      → {tables[0]}" + (f" 외 {len(tables) - 1}건" if len(tables) > 1 else "")
-        for rel, tables in stale[:MAX_SHOWN])
-    more = f"\n  … 외 {len(stale) - MAX_SHOWN}건" if len(stale) > MAX_SHOWN else ""
-    sys.stderr.write(
-        "[CODING — 표 갱신 점검] 이번 턴에 코드를 고쳤는데 해당 함수표를 갱신하지 "
-        "않았습니다:\n"
-        f"{listed}{more}\n"
-        "coding.md §6 은 함수·전역변수의 **추가·삭제·시그니처 변경** 시 같은 작업 "
-        "단위에서 표를 갱신하도록 요구합니다 — 미루면 다음 작업이 낡은 표를 읽습니다. "
-        "해당하면 지금 표를 갱신하고 마치십시오.\n"
-        "인터페이스가 그대로인 **내부 로직**만 바꿨다면 갱신 불요이므로 그대로 마쳐도 "
-        "됩니다(표는 인터페이스 수준 현황만 담습니다).\n")
+    msg = ["[CODING — §6 후속 갱신 점검] 이번 턴에 코드를 고쳤습니다. 마치기 전에 "
+           "아래를 확인하십시오.\n"]
+
+    if stale:
+        listed = "\n".join(
+            f"  · {rel}\n      → {tables[0]}"
+            + (f" 외 {len(tables) - 1}건" if len(tables) > 1 else "")
+            for rel, tables in stale[:MAX_SHOWN])
+        more = f"\n  … 외 {len(stale) - MAX_SHOWN}건" if len(stale) > MAX_SHOWN else ""
+        msg.append(
+            "\n▸ **함수표를 갱신하지 않았습니다**:\n"
+            f"{listed}{more}\n"
+            "  §6 은 함수·전역변수의 **추가·삭제·시그니처 변경** 시 같은 작업 단위에서 "
+            "표를 갱신하도록 요구합니다 — 미루면 다음 작업이 낡은 표를 읽습니다.\n"
+            "  인터페이스가 그대로인 **내부 로직**만 바꿨다면 갱신 불요이므로 그대로 "
+            "마쳐도 됩니다(표는 인터페이스 수준 현황만 담습니다).\n")
+
+    if not logged:
+        shown = ", ".join(edited_code[:MAX_SHOWN])
+        msg.append(
+            "\n▸ **수정 이력을 기록하지 않았습니다** — 이번 턴에 고친 코드: "
+            f"{shown}\n"
+            "  코드 수정의 이력(무엇을·왜 바꿨는가)은 주석이 아니라 `code_updates/` "
+            "entry 와 git commit message 가 담당합니다(coding.md §수정 이력 기록). "
+            "해당 모듈의 `docs/code_updates/` 에 entry 를 작성하십시오.\n")
+
+    sys.stderr.write("".join(msg))
     return 2
 
 
