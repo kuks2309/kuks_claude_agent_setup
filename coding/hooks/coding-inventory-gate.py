@@ -25,8 +25,11 @@
      c. 앵커 `파일명:숫자` 를 요구한다. 표의 위치 컬럼이 저장소 상대경로가 아니라
         `backend.py:315-349` 형식이기 때문. 맨 파일명 매칭은 __init__.py 류 오탐을 낳는다.
   4. 커버 표 있음 + 이번 세션 미독 → 차단 / 읽음 → 통과
-  5. 커버 표 없음 → 통과. CODING_GATE=strict 일 때만 차단(인벤토리 미도입 프로젝트에서
-     전면 차단하면 훅이 꺼지고 강제력이 0 으로 회귀하므로 기본값은 통과)
+  5. **커버 표 없음 → 차단**(표를 먼저 만들고 진행). §2 문언이 "표가 없으면 먼저 만든다"
+     이므로 여기서 통과시키면 규칙이 요구하는 것보다 약해진다. 초기 구현은 "훅이 꺼질까 봐"
+     통과를 기본값으로 뒀는데, 실측 결과 코드의 82%가 표 없이 무방비로 지나가며 부채를
+     쌓고 있었다(Big-AMR: 983개 중 등재 180개, 세션 14개 중 8개가 표를 한 번도 안 읽음).
+     운영 걱정으로 규칙을 약화하지 않는다 — 완화는 명시적 우회(CODING_GATE=lenient·.allow)로만.
 
 우회(오탐 대비 2중): CODING_GATE_SKIP=1 · <state>/reads/<sid>.allow 에 경로 1줄
 """
@@ -307,13 +310,24 @@ def gate_write(data, cwd, root):
     already = set(read_lines(reads_path(root, sid)))
 
     if not tables:
-        if os.environ.get("CODING_GATE") == "strict":
-            sys.stderr.write(
-                f"[CODING — 인벤토리 게이트/strict] `{rel}` 을 등재한 함수표가 "
-                "없습니다. coding.md §2 에 따라 코딩 전에 인벤토리를 먼저 작성하십시오 "
-                "(docs/code_review/<주제>/ 또는 docs/architecture/inventory.md).\n")
-            return 2
-        return 0
+        if os.environ.get("CODING_GATE") == "lenient":
+            return 0
+        sys.stderr.write(
+            f"[CODING — 인벤토리 게이트] `{rel}` 을 등재한 함수표가 없습니다. "
+            "coding.md §2 는 **표가 없으면 먼저 만든다**를 요구합니다 — 표 없이 고치면 "
+            "다음 작업이 이 파일의 용도를 모른 채 또 고치게 되고, 그것이 기술 부채로 "
+            "쌓입니다.\n"
+            "먼저 인벤토리를 작성하십시오:\n"
+            "  · 기존 파일 → `code_review` 번들로 함수표·전역변수표 작성 "
+            "→ `docs/code_review/<주제>/YYYY-MM-DD.md`\n"
+            "  · 신규 파일 → 설계할 함수·전역변수를 계획 단계에서 표로 작성\n"
+            "  · 위치 컬럼은 `<파일명>:<줄>` 형식이어야 이 게이트가 등재를 인식합니다 "
+            "(예: `backend.py:315-349`)\n"
+            "작성 후 그 표를 Read 하고 재시도하십시오.\n"
+            f"표를 만들 수 없는 정당한 예외(vendored·생성 코드 등)는 사용자 승인 후 "
+            f"{allow_path(root, sid)} 에 `{rel}` 을 1줄 추가하거나 "
+            "CODING_GATE=lenient 로 우회합니다.\n")
+        return 2
 
     if any(t in already for t in tables):
         return 0

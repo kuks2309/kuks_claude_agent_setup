@@ -217,18 +217,22 @@ check "exit 2 (차단)" 2 "$RC"
 hasnt "타 모듈 표를 요구 목록에 넣지 않음" "motor_control"
 teardown
 
-echo "T6  앵커 필수 — 파일명이 산문에만 등장하면 커버 아님"
+echo "T6  앵커 필수 — 파일명이 산문에만 등장하면 커버 아님 (→ 표 작성 요구)"
 setup
 hook PreToolUse Edit "src/Misc/notes/pkg/loader.py" sess-A
-check "exit 0 (통과)" 0 "$RC"
+check "exit 2 (차단)" 2 "$RC"
+has "'표 없음' 메시지" "함수표가 없습니다"
+hasnt "산문만 있는 파일을 표로 지목하지 않음" "misc/2026-08-01.md"
 teardown
 
-echo "T7  claude_guideline 규칙 문서는 표 후보 아님"
+echo "T7  claude_guideline 규칙 문서는 표 후보 아님 (→ 표 작성 요구)"
 setup
 rm -rf "$FIX/src/Comm/CAN/can_relay/docs" "$FIX/docs/code_review"
 mkdir -p "$FIX/pkg" && echo "x=1" > "$FIX/pkg/setup.py"
 hook PreToolUse Edit "pkg/setup.py" sess-A
-check "exit 0 (통과)" 0 "$RC"
+check "exit 2 (차단)" 2 "$RC"
+has "'표 없음' 메시지" "함수표가 없습니다"
+hasnt "규칙 문서를 표로 지목하지 않음" "claude_guideline/code_review/review.md"
 teardown
 
 echo "T8  세션 격리 — 타 세션이 읽어도 내 세션은 차단"
@@ -259,13 +263,25 @@ echo '| 1 | `vendor_fn` | 벤더 예제 | widget.ino:9 |' \
   > "$FIX/pkg/.pio/libdeps/lib/docs/code_review/vendor/x.md"
 echo "void loop(){}" > "$FIX/pkg/widget.ino"
 hook PreToolUse Edit "pkg/widget.ino" sess-A
-check "exit 0 (통과 — vendored 표는 무시)" 0 "$RC"
+check "exit 2 (차단)" 2 "$RC"
+has "'표 없음' 메시지" "함수표가 없습니다"
+hasnt "vendored 표를 지목하지 않음" ".pio/libdeps"
 teardown
 
-echo "T9  표 미등재 파일 → 기본 통과 (오탐 차단)"
+echo "T9  표 미등재 파일 → **차단** (표를 먼저 만들고 진행한다 — §2 문언)"
 setup
 hook PreToolUse Edit "src/Comm/CAN/can_relay/can_relay/helper.py" sess-A
+check "exit 2 (차단)" 2 "$RC"
+has "표 작성을 요구" "인벤토리"
+has "대상 파일 명시" "helper.py"
+teardown
+
+echo "T9b CODING_GATE=lenient → 표 미등재도 통과 (명시적 완화, 흔적 남음)"
+setup
+export CODING_GATE=lenient
+hook PreToolUse Edit "src/Comm/CAN/can_relay/can_relay/helper.py" sess-A
 check "exit 0 (통과)" 0 "$RC"
+unset CODING_GATE
 teardown
 
 echo "T10 규칙 비활성(coding.md 부재) → 통과"
@@ -297,12 +313,13 @@ check "exit 0 (통과)" 0 "$RC"
 unset CODING_GATE_SKIP
 teardown
 
-echo "T14 CODING_GATE=strict + 표 미등재 → 차단"
+echo "T14 표가 아예 하나도 없는 저장소에서도 차단 (부채 발생 지점을 열어두지 않는다)"
 setup
-export CODING_GATE=strict
-hook PreToolUse Edit "src/Comm/CAN/can_relay/can_relay/helper.py" sess-A
+rm -rf "$FIX/src/Comm/CAN/can_relay/docs" "$FIX/docs/code_review" \
+       "$FIX/src/Actuators/motor_control/docs" "$FIX/src/Misc/notes/docs"
+hook PreToolUse Edit "$BACKEND" sess-A
 check "exit 2 (차단)" 2 "$RC"
-unset CODING_GATE
+has "표 작성을 요구" "인벤토리"
 teardown
 
 echo "T15 MultiEdit 도 게이트 대상"
