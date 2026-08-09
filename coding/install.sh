@@ -203,10 +203,12 @@ CLAUDE_MD="$TARGET/CLAUDE.md"; MARKER="kuks_agent_setup:$BUNDLE"; touch "$CLAUDE
 if grep -qF "$MARKER" "$CLAUDE_MD"; then echo "• CLAUDE.md 등록 이미 존재 — 스킵"
 else printf '\n' >> "$CLAUDE_MD"; cat "$SRC/claude.snippet.md" >> "$CLAUDE_MD"; echo "✓ CLAUDE.md 등록 추가"; fi
 
-# 강제 훅 2종
-#   reminder       (UserPromptSubmit) — 트리거 감지 시 규칙 SOP 주입 [1세대: 주입]
-#   inventory-gate (PreToolUse/PostToolUse) — 함수표 선독을 차단으로 강제 [2세대: 차단]
-# 주입만으로는 "표 갱신은 코딩 끝나고" 미루기를 막지 못한 실사격 사례가 있어 차단을 더했다.
+# 강제 훅 3종 — §2(선독)와 §6(갱신)을 각각 다른 시점에서 잡는다
+#   reminder       (UserPromptSubmit)        — SOP 주입 + 프롬프트 심볼의 표 행 주입
+#   inventory-gate (PreToolUse/PostToolUse)  — 표 미독 시 수정 차단, 읽은 표 기록
+#   record-gate    (Stop)                    — 고친 코드의 표를 갱신했는지 턴 종료 시 확인
+# 주입은 미루기를 막지 못하므로 차단이, ⟦CI:index-fresh⟧ 는 커밋 시점이라 커밋 없는
+# 턴이 비므로 Stop 확인이 각각 필요하다.
 if [ -d "$SRC/hooks" ]; then
   mkdir -p "$DEST/hooks"
   for h in "$SRC/hooks/"*.py; do
