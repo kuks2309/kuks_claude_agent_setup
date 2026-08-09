@@ -155,5 +155,39 @@ run end SESG >/dev/null 2>&1
 [ "$(git -C "$ROOT/repo" rev-parse refs/heads/main)" = "$(git -C "$ROOT/repo" rev-parse origin/main)" ] \
   && ok detached_ref_updated || no detached_ref_updated "main ref 미갱신"
 
+# 정리·생성 실패는 **드러나야** 한다. 오류를 삼키면 브랜치·디렉터리가 남아도 "정리됨"이
+# 찍히고, 다음 start 가 '이미 존재'로 막힌다(실측: 이전 실행의 디렉터리가 남아 start 실패,
+# 그때 생성된 브랜치만 남아 두 번째 실패를 부름).
+echo "== start 실패 시 잔여 브랜치를 남기지 않는다 =="
+setup
+WTX="$ROOT/repo-ses-SESX"
+mkdir -p "$WTX"; echo "이전 실행 잔재" > "$WTX/leftover.txt"   # 경로 선점
+OUT="$(run start SESX 2>&1)"; rc=$?
+[ "$rc" != 0 ] && ok start_fail_exit_nonzero || no start_fail_exit_nonzero "실패인데 exit=$rc"
+echo "$OUT" | grep -q "worktree 생성 실패" && ok start_fail_reported || no start_fail_reported "실패를 알리지 않음"
+git -C "$ROOT/repo" show-ref --verify --quiet refs/heads/session/SESX \
+  && no start_fail_no_dangling_branch "잔여 브랜치 session/SESX 남음" || ok start_fail_no_dangling_branch
+
+echo "== end 성공 시 디렉터리까지 실제로 사라진다 =="
+setup
+run start SESY >/dev/null 2>&1
+WTY="$ROOT/repo-ses-SESY"
+echo "Y작업" > "$WTY/y.txt"; git -C "$WTY" add -A; git -C "$WTY" commit -q -m "Y work"
+OUT="$(run end SESY 2>&1)"
+[ ! -e "$WTY" ] && ok end_dir_gone || no end_dir_gone "디렉터리 잔존: $WTY"
+echo "$OUT" | grep -q "정리됨" && ok end_reports_clean || no end_reports_clean "정리 완료 보고 없음"
+echo "$OUT" | grep -q "정리에 남은 것" && no end_no_false_alarm "잔여 없는데 경고" || ok end_no_false_alarm
+
+echo "== 원격에 세션 브랜치가 없어도 실패로 보고하지 않는다 =="
+setup
+run start SESZ >/dev/null 2>&1
+WTZ="$ROOT/repo-ses-SESZ"
+echo "Z작업" > "$WTZ/z.txt"; git -C "$WTZ" add -A; git -C "$WTZ" commit -q -m "Z work"
+git -C "$ROOT/repo" push -q origin session/SESZ 2>/dev/null || true
+git -C "$ROOT/repo" push -q origin --delete session/SESZ 2>/dev/null || true   # 원격만 미리 제거
+OUT="$(run end SESZ 2>&1)"
+echo "$OUT" | grep -q "원격 브랜치 삭제 실패" && no end_no_remote_false_alarm "없는 원격 브랜치를 실패로 보고" \
+  || ok end_no_remote_false_alarm
+
 echo "-- 결과: PASS=$PASS FAIL=$FAIL --"
 [ "$FAIL" = 0 ]

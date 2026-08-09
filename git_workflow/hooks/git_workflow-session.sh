@@ -131,7 +131,21 @@ cmd_start(){
     [ -n "$ex" ] && echo "$ex"; exit 0
   fi
   local base; base="$(merge_base_ref "$repo")"
-  git -C "$repo" worktree add "$wt" -b "$branch" "$base" -q
+  # 생성 실패 시 브랜치만 남는 경우가 있다(예: 경로에 이전 실행의 디렉터리가 잔존).
+  # 그대로 두면 다음 start 가 '이미 존재'로 막히므로, 만들어진 브랜치를 되돌린다.
+  local out
+  if ! out="$(git -C "$repo" worktree add "$wt" -b "$branch" "$base" -q 2>&1)"; then
+    err "worktree 생성 실패: $wt"
+    err "   git: $(echo "$out" | head -2 | tr '\n' ' ')"
+    if git -C "$repo" show-ref --verify --quiet "refs/heads/$branch" && \
+       [ -z "$(worktree_of_branch "$repo" "$branch")" ] && \
+       [ "$(git -C "$repo" rev-list --count "$base..$branch" 2>/dev/null || echo 1)" = "0" ]; then
+      git -C "$repo" branch -D "$branch" -q 2>/dev/null && \
+        err "   (커밋 없는 잔여 브랜치 $branch 되돌림)"
+    fi
+    [ -e "$wt" ] && err "   경로에 남은 것: $wt — 확인 후 정리하세요."
+    exit 1
+  fi
   link_shared_assets "$repo" "$wt"
   say "worktree 생성: $wt (branch $branch, base $base)"
   say "→ 이 폴더에서 작업하세요. 종료 시 'end $short' 로 main 병합·정리."
@@ -192,12 +206,36 @@ cmd_end(){
   git -C "$repo" worktree prune 2>/dev/null || true
 
   if [ "$merged" = 1 ]; then
-    local swt; swt="$(worktree_of_branch "$repo" "$branch")"
-    [ -n "$swt" ] && git -C "$repo" worktree remove --force "$swt" 2>/dev/null || true
-    git -C "$repo" branch -D "$branch" -q 2>/dev/null || true
-    git -C "$repo" push origin --delete "$branch" -q 2>/dev/null || true
+    # 정리 결과를 모아 보고한다. 각 단계의 오류를 삼키면 브랜치·디렉터리가 남아도
+    # "정리됨" 이 찍혀 알 방법이 없고, 다음 `start` 가 '이미 존재'로 실패한다.
+    local swt out left=""
+    swt="$(worktree_of_branch "$repo" "$branch")"
+    if [ -n "$swt" ]; then
+      if ! out="$(git -C "$repo" worktree remove --force "$swt" 2>&1)"; then
+        left="$left\n  - worktree 제거 실패: $swt — $(echo "$out" | head -1)"
+      fi
+    fi
+    git -C "$repo" worktree prune 2>/dev/null || true
+    # remove 가 성공해도 다른 도구가 그 안에 만든 파일 때문에 디렉터리가 남을 수 있다.
+    if [ -n "$swt" ] && [ -d "$swt" ]; then
+      left="$left\n  - 디렉터리 잔존: $swt ($(find "$swt" -mindepth 1 2>/dev/null | wc -l) 항목)"
+    fi
+    if ! out="$(git -C "$repo" branch -D "$branch" 2>&1)"; then
+      left="$left\n  - 로컬 브랜치 삭제 실패: $branch — $(echo "$out" | head -1)"
+    fi
+    if git -C "$repo" ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+      if ! out="$(git -C "$repo" push origin --delete "$branch" 2>&1)"; then
+        left="$left\n  - 원격 브랜치 삭제 실패: origin/$branch — $(echo "$out" | head -1)"
+      fi
+    fi
     sync_local_main "$repo"   # origin 만 전진하고 공유 main 이 뒤처지는 발산 차단
-    say "✓ $branch → main 병합·push 완료, worktree·브랜치 정리됨"
+    if [ -n "$left" ]; then
+      err "⚠ 병합·push 는 완료했으나 정리에 남은 것이 있습니다:"
+      printf '%b\n' "$left" >&2
+      err "   방치하면 다음 'start' 가 '이미 존재'로 실패합니다 — 수동 정리 필요."
+    else
+      say "✓ $branch → main 병합·push 완료, worktree·브랜치 정리됨"
+    fi
     exit 0
   fi
   exit 3   # 보류(충돌/실패) — 브랜치 보존

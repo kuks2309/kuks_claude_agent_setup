@@ -76,6 +76,8 @@ push·리뷰 방식이 모드에 갈리므로 **작업 전 먼저 판정**한다
   1. **시작**: `bash <…>/hooks/git_workflow-session.sh start <session_id>` → `origin/main` 기준 `../<repo>-ses-<id>` 링크드 worktree + `session/<id>` 브랜치 생성(공유 HEAD 불변). 출력된 그 폴더에서 작업·커밋한다(§1 규칙: 명시 staging·`type(scope): subject`+`Co-Authored-By`).
   2. **종료(자동)**: SessionEnd 훅 `git_workflow-session-end.py` 가 자동으로 `session/<id>` 를 `main` 에 **안전 병합**(임시 worktree 에서 `origin/main` 최신 위로 병합, `merge.lock` **flock 직렬화** → 동시 종료도 경쟁 없음)하고 `origin`+`fito` 둘 다 push 후 **worktree·브랜치(로컬+원격) 정리**한다. 수동 실행: `git_workflow-session.sh end <session_id>`.
 
+     **정리 결과는 반드시 보고한다** — worktree 제거·디렉터리 잔존·로컬/원격 브랜치 삭제를 각각 확인해 하나라도 남으면 목록으로 알린다. 오류를 삼키면 남아도 "정리됨"이 찍혀 알 방법이 없고, 다음 `start` 가 **'이미 존재'로 막힌다**(실측: 잔존 디렉터리 때문에 `start` 실패 → 그때 만들어진 브랜치만 남아 두 번째 실패를 부름). `start` 도 같은 원칙 — worktree 생성이 실패하면 그 과정에서 만들어진 **커밋 없는 세션 브랜치를 되돌리고** 실패 사유와 남은 경로를 알린다. 원격에 세션 브랜치가 없는 경우는 실패가 아니다(삭제 시도 자체를 건너뛴다).
+
      정리 직후 **공유 저장소의 로컬 `main` 을 `origin/main` 에 맞춘다**(`sync_local_main`). 병합은 임시 detached worktree 에서 일어나 push 후 폐기되므로, 이 단계가 없으면 `refs/heads/main` 을 갱신하는 경로가 없어 **origin 만 전진하고 공유 `main` 은 영구히 뒤처진다**(실측: 55 커밋 발산). 분기 — `main` 미체크아웃 → `update-ref`(작업트리 무영향) / 체크아웃 → `merge --ff-only` 를 실행하고 **git 자신의 보호에 맡긴다**(덮어쓸 변경이 있으면 git 이 거부, 무관하면 전진). 보류 시 반드시 소리내어 알린다. dirty 이면 무조건 보류하던 판정은 과했다 — 공유 트리에는 타 세션의 **미추적** 파일이 상시 남아 있어(ff 로 덮일 수 없는 것들) 로컬 `main` 이 영영 동기화되지 못했다.
   3. **충돌·발산 시**: 자동 병합을 **보류**(exit 3) — 브랜치·worktree 보존하고 사용자가 `git merge --no-ff session/<id>` 로 수동 해결. Claude 는 충돌을 자동 해결하지 않는다. 보류된 브랜치는 방치될수록 기준이 전진해 충돌이 커지므로, session_workflow 번들을 함께 쓰면 시작 주입이 **미회수 브랜치**(2일 이상)를 매번 노출한다.
 - **훅·규칙 상속(worktree)** — `start` 는 worktree 생성 직후 공유 트리의 `.claude/settings.json` 과 `docs/claude_guideline` 을 **심볼릭 링크**한다(`link_shared_assets`). worktree 는 git 추적 파일만 체크아웃하는데 설치본은 대개 미추적·gitignore 대상이라, 링크가 없으면 **세션 격리를 강제해야 할 그 트리에서 훅이 조용히 무동작**이 된다. 브랜치가 일부 번들을 추적 중이면 그 추적본은 덮지 않고 없는 번들만 링크한다.
@@ -146,7 +148,9 @@ git log -1 --format='%s' | grep -E "^(feat|fix|docs|refactor|style|chore|test)(\
 
 ---
 
-**VERSION**: 1.8.2 (1.8.1 + 실사용 시험에서 드러난 `sync_local_main` 결함 2건 수정 — ① dirty 이면 무조건 ff 보류하던 판정을 `merge --ff-only` 실행 후 git 의 거부에 맡기는 방식으로(공유 트리의 상시 미추적 파일 때문에 로컬 `main` 이 영영 동기화되지 못하던 문제) ② `set -e` 하에서 실패하는 명령 치환을 대입문에 써 보류 경고가 조용히 사라지던 문제 + 임시 worktree admin 항목 `prune` 추가)
+**VERSION**: 1.8.3 (1.8.2 + `start`·`end` 의 정리 실패를 조용히 삼키지 않고 보고 — worktree 제거·디렉터리 잔존·로컬/원격 브랜치 삭제를 각각 확인해 남은 것을 목록으로 알리고, `start` 실패 시 그 과정에서 만들어진 커밋 없는 세션 브랜치를 되돌린다. 원격에 세션 브랜치가 없는 경우는 실패로 보고하지 않는다)
+
+1.8.2 (1.8.1 + 실사용 시험에서 드러난 `sync_local_main` 결함 2건 수정 — ① dirty 이면 무조건 ff 보류하던 판정을 `merge --ff-only` 실행 후 git 의 거부에 맡기는 방식으로(공유 트리의 상시 미추적 파일 때문에 로컬 `main` 이 영영 동기화되지 못하던 문제) ② `set -e` 하에서 실패하는 명령 치환을 대입문에 써 보류 경고가 조용히 사라지던 문제 + 임시 worktree admin 항목 `prune` 추가)
 
 1.8.1 (1.8.0 + §2-1 목적 정정 — 세션 브랜치는 **작업 기록을 세션 단위로 나누기 위한 것**이며 동시 push 경쟁 완화는 부수 효과. "이력 격리를 원할 때 선택"·"동시 push 경쟁 방지뿐" 표현이 목적을 git 편의로 오독하게 만들던 것을 수정)
 
