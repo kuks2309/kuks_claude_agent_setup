@@ -58,6 +58,18 @@ edge 표 컬럼: `토픽`, `발행 노드`, `구독 노드(들)`, `메시지 타
 - **다중 발행자** — 한 토픽에 pub ≥ 2 → 의도 확인(충돌·중복)
 - **외부 경계** — 본 패키지 밖 노드(벤더 드라이버·타 패키지)와의 연결은 별도 표기 (Core 의존성 3-tier 런타임 필수와 연계)
 
+**A-8. 기동 절차 (bringup)** — **측정치·실기 결과가 포함된 리뷰에서 의무**. 그 수치가 어떤 그래프 위에서 나왔는지 확정할 수 없으면 평가 자체가 성립하지 않는다.
+
+컬럼: `단계`, `런치/명령`, `띄우는 노드`, `순서 의존(선행 단계)`, `절차서 위치(파일:줄)`
+
+점검:
+
+- **절차서 부재** — 기동 순서가 문서화되어 있지 않다 → 재현 불가. 측정치는 잠정으로만 취급.
+- **절차 밖 기동** — 표에 없는 개별 `ros2 run` 이 측정 시점에 떠 있었다("얹기 상태") → 그 수치는 측정치가 아니다.
+- **발행자 수 미확인** — 측정 대상 토픽의 발행자 수(기대 1)를 기동 후 확인한 증거가 없다 → A-6/A-7 의 다중 발행자 점검이 정적 코드에만 적용되고 런타임에서 검증되지 않은 상태.
+
+> 근거: 발행자가 2개인 상태로 측정한 주기 수치가 여러 인스턴스의 합계로 판명되어 보고가 전량 무효 처리된 사례. 정적 리뷰(A-6·A-7)는 코드상 pub 이 1개여도 **런타임에 같은 노드가 두 번 떠 있는 경우**를 잡지 못한다 — A-8 이 그 사각을 덮는다. 작성 측 규율은 `coding` 번들 `ros2-coding.md` §5 와 상보.
+
 ## 2. 평가 추가 카테고리 (인라인 태그)
 
 - `[QoS]` — pub/sub 호환성 불일치 (A-6 매트릭스 기반). **offered(pub) < requested(sub)** 인 축이 있으면 연결 실패 — 특히 `BEST_EFFORT`→`RELIABLE`(reliability), `VOLATILE`→`TRANSIENT_LOCAL`(durability, late-joiner 손실). depth 부족은 버스트 시 드롭.
@@ -66,6 +78,7 @@ edge 표 컬럼: `토픽`, `발행 노드`, `구독 노드(들)`, `메시지 타
 - `[exec]` — 콜백 그룹·executor 선택 적합성(single vs multi-threaded)
 - `[param]` — 파라미터 default 의 물리량·범위·단위 일관성(YAML 의미 그룹별 검토)
 - `[runtime]` — 런타임 필수 노드 부재 시 동작 정의 명확성(의존성 표 tier 2 연계)
+- `[bringup]` — 기동 규율 위반 (A-8 기반): 기동 절차서 부재, 절차 밖 `ros2 run` 얹기 상태의 수치를 측정치로 제출, 측정 대상 토픽의 발행자 수 미확인. 정적 pub 1개와 런타임 발행자 1개는 다른 명제다.
 
 ## 3. 자체 점검 grep
 
@@ -81,8 +94,12 @@ grep -E "RxO|offered.*requested|BEST_EFFORT|TRANSIENT_LOCAL" $TARGET
 # 노드 연결 그래프(rqt_graph 등가) 존재 — 다중 노드 시 의무
 grep -E "발행 노드.*구독 노드|--\[.*\]-->|연결 그래프" $TARGET
 
+# 기동 절차 표(A-8) 존재 — 측정치 포함 리뷰 시 의무
+grep -qE "측정|Hz|주기|성능" $TARGET && { grep -E "런치/명령|띄우는 노드|기동 절차" $TARGET \
+  || echo "⚠ 측정치가 있는데 A-8 기동 절차 표 없음 → [bringup]"; }
+
 # ROS2 평가 태그 등장
-grep -oE "\[(QoS|ns|exec|param|runtime)\]" $TARGET | sort -u
+grep -oE "\[(QoS|ns|exec|param|runtime|bringup)\]" $TARGET | sort -u
 
 # YAML 파라미터 단위 주석 (의미 그룹별)
 grep -E "# (rad|m|Hz|deg|°|s|ms)" $TARGET
@@ -92,3 +109,4 @@ grep -E "# (rad|m|Hz|deg|°|s|ms)" $TARGET
 
 - **concurrency 와 상보** — multi-threaded executor·콜백 그룹은 concurrency 도메인의 race/deadlock 평가와 함께 적용.
 - Core 의존성 3-tier(런타임 필수)와 `[runtime]` 태그 cross-reference.
+- **`coding` 번들 `ros2-coding.md` §5 와 상보** — 그쪽은 구동 시점을 **통제**(기동 전 정리·고정 절차), 본 도메인은 그 결과를 **검증**(A-8·`[bringup]`). 한쪽만 있으면 규율이 지켜졌는지 사후에 알 수 없다.
