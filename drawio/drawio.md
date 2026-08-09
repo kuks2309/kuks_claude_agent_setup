@@ -260,12 +260,9 @@ windowactivate --sync` 로 창을 올린다) → 창을 닫는다.
 | **활성화** 후 Fit Page | 키 입력이 drawio 창에 닿지 않아 화면 맞춤이 안 된다 |
 | 캡처 직전 **재확인** | 로딩 중 제목이 `Untitled Diagram` → 파일명으로 바뀌고 인스턴스가 여럿이면 창 id 가 달라진다 |
 
-창 활성화는 `wmctrl -i -a`(없으면 `xdotool windowactivate`)를 쓴다.
-
-> **데스크톱이 창 개요(GNOME Activities) 상태면 GUI 캡처가 성립하지 않는다.**
-> 창 좌표 자리에 축소 썸네일이 그려져 무엇을 찍어도 개요 화면이 나온다. 스크립트가
-> 이 상태를 깨지 못한다 — 화면에서 `Esc` 를 눌러 빠져나온 뒤 다시 실행하거나,
-> `--export` 를 쓴다(개요 상태와 무관).
+창 활성화는 `wmctrl -i -a`(없으면 `xdotool windowactivate`)를 쓴다. 데스크톱이 창
+개요(GNOME Activities) 상태여도 이 활성화가 개요를 닫으므로 캡처는 정상 동작한다
+(실측: `OverviewActive=true` 에서 시작해 캡처 성공, 종료 후 `false`).
 
 두 방식 모두 마지막 줄 `CAPTURED <경로>` 가 PNG 위치다.
 
@@ -313,7 +310,8 @@ python3 checks/drawio_lint.py $(git ls-files '*.drawio') --quiet
 그 SOP 가 정한다 — 코드 리뷰 플로우차트는 code_review, 파일그래프·클래스·시퀀스는
 sw_structure. 본 문서는 **만든 `.drawio` 가 갖춰야 할 품질**만 정한다.
 
-**VERSION**: 1.4.0 (강제 3겹 신설 — reminder·write-gate 훅 + ⟦CI:drawio-lint⟧
+**VERSION**: 1.4.1 (창 개요 상태에서 캡처가 안 된다는 서술 삭제 — 실측 결과
+창 활성화가 개요를 닫아 정상 동작한다. 1.4.0 강제 3겹 신설 — reminder·write-gate 훅 + ⟦CI:drawio-lint⟧
 pre-commit 이빨. 창 선택 로직을 모듈로 분리해 SIL 로 고정. 설치 단계가 의존성을 구성 — scripts/setup_env.sh,
 --no-deps/--check 플래그. GUI 캡처 경로 실측 수선 — 문서 창 대기·맨앞 올리기·region
 캡처. L11 신설 — html=1 라벨의 꺾쇠가 태그로 먹혀 글자가 사라지는
