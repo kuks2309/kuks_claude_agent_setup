@@ -20,7 +20,7 @@ cd coding && ./install.sh <타깃-프로젝트-루트> [도메인...|--all]
 진짜 인터록은 **코드에서 재도출(re-derive)되는 것뿐**이다. 모든 규칙에 강제 태그를 단다:
 
 - **`⟦CI:<id>⟧`** = `checks/<id>.sh` 가 커밋된 코드로부터 결정론적으로 재도출·차단(pre-commit·CI). **에이전트가 못 속인다.** (현재 `<id>` ∈ {index-fresh, dup-signature, tests-ran, banned-pattern, adr-fields})
-- **`⟦훅:<id>⟧`** = `hooks/coding-<id>.py` 가 **도구 호출 시점에 차단**(Claude Code 훅). 사후 재도출이 아니라 사전 차단이라 **하려던 작업 자체가 막힌다.** 자기보고에 의존하지 않으므로 advisory 가 아니다. 한계는 정직하게: 훅 미설치 환경(설정 미등록·타 에이전트)에서는 강제력 0 이고, 우회 경로(`CODING_GATE_SKIP=1`·`.allow` 파일)가 열려 있다 — 다만 우회는 **명시적이라 흔적이 남는다**. (현재 `<id>` ∈ {inventory-gate, record-gate})
+- **`⟦훅:<id>⟧`** = `hooks/coding-<id>.py` 가 **도구 호출 시점에 차단**(Claude Code 훅). 사후 재도출이 아니라 사전 차단이라 **하려던 작업 자체가 막힌다.** 자기보고에 의존하지 않으므로 advisory 가 아니다. 한계는 정직하게: 훅 미설치 환경(설정 미등록·타 에이전트)에서는 강제력 0 이고, 우회 경로(`CODING_GATE_SKIP=1`·`.allow` 파일)가 열려 있다 — 다만 우회는 **명시적이라 흔적이 남는다**. (현재 `<id>` ∈ {inventory-gate, record-gate, comment-gate})
 - **`⟦권고⟧`** = 코드 재도출도 시점 차단도 불가. 에이전트 자기보고에 의존하므로 **정직하게 advisory**. (태그 없는 체크박스는 전부 `⟦권고⟧`.)
 
 핵심 명제 세 줄:
@@ -122,6 +122,7 @@ grep -oE '⟦(CI|훅):[a-z-]+⟧' docs/claude_guideline/coding/coding.md | sort 
 # 인벤토리 게이트 동작 검증 (설치본에서 재실행 가능 — 선언만 하고 검증 안 하는 실패 방지)
 bash docs/claude_guideline/coding/tests/inventory-gate.test.sh
 bash docs/claude_guideline/coding/tests/record-gate.test.sh
+bash docs/claude_guideline/coding/tests/comment-gate.test.sh
 
 # MUST 예산 (룰 요약 항목 ≤ 7)
 test "$(grep -cE '^[0-9]+\. ' docs/claude_guideline/coding/coding.md)" -le 7 || echo "MUST 예산 초과"
@@ -136,4 +137,4 @@ test "$(grep -cE '^[0-9]+\. ' docs/claude_guideline/coding/coding.md)" -le 7 || 
 
 ---
 
-**VERSION**: 1.3.0 (CI 재도출 척추 + 작성 규율 advisory + never-self-approve 헌법 + trivial fast-path; 강제 태그 ⟦CI⟧/⟦훅⟧/⟦권고⟧ 3분류; 강제 로직은 checks/*.sh·hooks/*.py 위임; §2 함수표 선독을 inventory-gate 훅이 시점 차단 — 최근접 조상 모듈 표 + `파일명:줄` 앵커, 실사격 저장소 실측 확정; self-contained·OMC-free; **표 부재 시 차단이 기본값** — §2 "표가 없으면 먼저 만든다"의 기계 강제, 완화는 CODING_GATE=lenient; §6 표 갱신은 Stop 훅 record-gate 가 턴마다 대면)
+**VERSION**: 1.4.0 (CI 재도출 척추 + 작성 규율 advisory + never-self-approve 헌법 + trivial fast-path; 강제 태그 ⟦CI⟧/⟦훅⟧/⟦권고⟧ 3분류; 강제 로직은 checks/*.sh·hooks/*.py 위임; §2 함수표 선독을 inventory-gate 훅이 시점 차단 — 최근접 조상 모듈 표 + `파일명:줄` 앵커, 실사격 저장소 실측 확정; self-contained·OMC-free; **표 부재 시 차단이 기본값** — §2 "표가 없으면 먼저 만든다"의 기계 강제, 완화는 CODING_GATE=lenient; §6 표 갱신은 Stop 훅 record-gate 가 턴마다 대면; 이력 주석은 comment-gate 가 추가 시점에 차단)
