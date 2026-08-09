@@ -202,14 +202,31 @@ python3 checks/drawio_lint.py <file>.drawio --strict        # 경고도 실패 �
 Layer B 렌더**다. 반대로 L5 가 통과했는데 렌더에서 넘쳤다면 상수를 조정하고
 fixture 를 남긴다.
 
-## 3. Layer A 를 CI 에 거는 법
+## 3. 강제 (규칙이 아니라 기계가 지키는 부분)
+
+규칙만 적어두면 안 지켜진다 — 이 번들이 고치려던 문제가 그거였다. 세 겹으로 건다.
+
+| 겹 | 언제 | 무엇 | 설치 |
+| --- | --- | --- | --- |
+| `hooks/drawio-reminder.py` | 다이어그램 트리거 프롬프트 | 작성 **전** 규칙 주입(예방) | install.sh 가 `settings.json` 에 등록 |
+| `hooks/drawio-write-gate.py` | `.drawio` 를 Write/Edit 한 직후 | Layer A 를 즉시 돌려 결함 반환 | 〃 |
+| `checks/drawio-lint.sh` ⟦CI:drawio-lint⟧ | 커밋 | staged `.drawio` 결함 시 **커밋 차단** | 선택 — pre-commit 켤 때 |
+
+write-gate 는 커밋 없는 턴도 잡고, pre-commit 이빨은 훅이 없는 환경에서도 막는다 — 상보적이다.
 
 ```bash
-# pre-commit / CI — 변경된 .drawio 만 검사
-for d in $(git diff --cached --name-only --diff-filter=ACM | grep '\.drawio$'); do
-  python3 docs/claude_guideline/drawio/checks/drawio_lint.py "$d" || exit 1
-done
+# 커밋 차단까지 켜기 (선택)
+cp docs/claude_guideline/drawio/pre-commit-config.sample.yaml .pre-commit-config.yaml
+pip install pre-commit && pre-commit install
+
+# 수동/CI 실행
+docs/claude_guideline/drawio/checks/drawio-lint.sh            # staged 만
+docs/claude_guideline/drawio/checks/drawio-lint.sh --all      # 추적 중인 전부
+docs/claude_guideline/drawio/checks/drawio-lint.sh <경로> --strict
 ```
+
+**Layer B 는 기계가 못 지킨다.** 렌더 검토는 눈이 필요해 훅·이빨로 강제할 수 없다 —
+위 세 겹이 전부 통과해도 §4 를 수행하기 전에는 2단 루프의 절반일 뿐이다.
 
 ## 4. Layer B — 렌더 시각 검증
 
@@ -296,7 +313,8 @@ python3 checks/drawio_lint.py $(git ls-files '*.drawio') --quiet
 그 SOP 가 정한다 — 코드 리뷰 플로우차트는 code_review, 파일그래프·클래스·시퀀스는
 sw_structure. 본 문서는 **만든 `.drawio` 가 갖춰야 할 품질**만 정한다.
 
-**VERSION**: 1.3.0 (설치 단계가 의존성을 구성 — scripts/setup_env.sh,
+**VERSION**: 1.4.0 (강제 3겹 신설 — reminder·write-gate 훅 + ⟦CI:drawio-lint⟧
+pre-commit 이빨. 창 선택 로직을 모듈로 분리해 SIL 로 고정. 설치 단계가 의존성을 구성 — scripts/setup_env.sh,
 --no-deps/--check 플래그. GUI 캡처 경로 실측 수선 — 문서 창 대기·맨앞 올리기·region
 캡처. L11 신설 — html=1 라벨의 꺾쇠가 태그로 먹혀 글자가 사라지는
 결함. 실사용 렌더 검토에서 발견되어 규칙화)

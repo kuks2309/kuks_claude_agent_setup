@@ -12,6 +12,8 @@
 #   1-b) checks/ 복사 (drawio_lint.py · drawio_capture.sh · fixture)
 #   1-c) references/ 복사 (visual-checklist.md)
 #   1-d) scripts/ 복사 (setup_env.sh)
+#   1-e) hooks/ 복사 + settings.json 등록 (UserPromptSubmit·PostToolUse)
+#   1-f) pre-commit 템플릿 복사(.sample, 덮어쓰기 금지)
 #   2) claude.snippet.md 를 <타깃>/CLAUDE.md 에 append (마커 중복방지)
 #   3) 의존성 설치 — scripts/setup_env.sh (멱등: 있으면 건너뜀)
 #   4) 설치 성공 시 <타깃>/docs/claude_guideline/INSTALLED.md 에 자기 행 기록
@@ -91,8 +93,10 @@ record_install() {
 # 설치본 ↔ 저장소 내용 대조 쌍(원본<TAB>설치본). 번들별로 복사 대상과 일치시켜 유지.
 drift_pairs() {
   printf '%s\t%s\n' "$SRC/drawio.md" "$DEST/drawio.md"
+  [ -f "$SRC/.pre-commit-config.yaml" ] && printf '%s\t%s\n' \
+    "$SRC/.pre-commit-config.yaml" "$DEST/pre-commit-config.sample.yaml"
   local c sub
-  for sub in checks references scripts; do
+  for sub in checks references scripts hooks; do
     [ -d "$SRC/$sub" ] || continue
     for c in "$SRC/$sub/"*; do
       [ -f "$c" ] || continue
@@ -195,6 +199,62 @@ if [ -d "$SRC/scripts" ]; then
   echo "✓ scripts 복사: docs/claude_guideline/$BUNDLE/scripts/"
 fi
 
+# 1-e) hooks/ 복사 + settings.json 등록
+#   reminder(UserPromptSubmit) = 작성 전 규칙 주입(예방)
+#   write-gate(PostToolUse)    = .drawio 를 쓴 직후 린트(적발). 커밋 없는 턴도 잡는다.
+if [ -d "$SRC/hooks" ]; then
+  mkdir -p "$DEST/hooks"
+  cp "$SRC"/hooks/*.py "$DEST/hooks/" 2>/dev/null || true
+  chmod +x "$DEST"/hooks/*.py 2>/dev/null || true
+  echo "✓ hooks 복사: docs/claude_guideline/$BUNDLE/hooks/"
+  PYBIN=""
+  for c in python3 python; do command -v "$c" >/dev/null 2>&1 && { PYBIN="$c"; break; }; done
+  if [ -z "$PYBIN" ]; then
+    echo "⚠ python3/python 없음 — settings.json 훅 등록 건너뜀. 수동 등록 필요."
+  else
+    mkdir -p "$TARGET/.claude"
+    SETTINGS="$TARGET/.claude/settings.json"
+    [ -f "$SETTINGS" ] && cp "$SETTINGS" "$SETTINGS.bak"
+    "$PYBIN" - "$SETTINGS" "$PYBIN" "$BUNDLE" <<'PYEOF'
+import json, sys
+settings_path, pybin, bundle = sys.argv[1], sys.argv[2], sys.argv[3]
+base = f'docs/claude_guideline/{bundle}/hooks'
+plan = [
+    ("UserPromptSubmit", f'{pybin} "$CLAUDE_PROJECT_DIR/{base}/{bundle}-reminder.py"', 5, None),
+    ("PostToolUse", f'{pybin} "$CLAUDE_PROJECT_DIR/{base}/{bundle}-write-gate.py"', 30,
+     "Write|Edit|MultiEdit"),
+]
+try:
+    with open(settings_path, encoding="utf-8") as f:
+        cfg = json.load(f)
+except (FileNotFoundError, json.JSONDecodeError):
+    cfg = {}
+hooks = cfg.setdefault("hooks", {})
+changed = False
+for event, cmd, timeout, matcher in plan:
+    groups = hooks.setdefault(event, [])
+    if any(h.get("command") == cmd for g in groups for h in g.get("hooks", [])):
+        print(f"• settings.json {event} 훅 이미 존재 — 스킵")
+        continue
+    entry = {"hooks": [{"type": "command", "command": cmd, "timeout": timeout}]}
+    if matcher:
+        entry["matcher"] = matcher
+    groups.append(entry)
+    changed = True
+    print(f"✓ settings.json {event} 훅 등록")
+if changed:
+    with open(settings_path, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+PYEOF
+  fi
+fi
+
+# 1-f) pre-commit 템플릿 (.sample, 덮어쓰기 금지)
+if [ -f "$SRC/.pre-commit-config.yaml" ]; then
+  cp "$SRC/.pre-commit-config.yaml" "$DEST/pre-commit-config.sample.yaml"
+  echo "✓ pre-commit 템플릿(.sample): docs/claude_guideline/$BUNDLE/pre-commit-config.sample.yaml"
+fi
+
 # 2) CLAUDE.md 등록 (마커 중복방지)
 CLAUDE_MD="$TARGET/CLAUDE.md"
 MARKER="kuks_agent_setup:$BUNDLE"
@@ -230,4 +290,8 @@ fi
 record_install
 echo
 echo "점검: $DEST/checks/drawio_capture.sh --check"
+echo "강제: 훅 2개 등록됨(작성 전 규칙 주입 · 작성 직후 린트)."
+echo "      커밋 차단까지 원하면 pre-commit 도 켜세요 —"
+echo "        cp $DEST/pre-commit-config.sample.yaml .pre-commit-config.yaml"
+echo "        pip install pre-commit && pre-commit install"
 echo "완료: $BUNDLE → $TARGET"

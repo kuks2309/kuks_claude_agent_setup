@@ -24,8 +24,10 @@
 #       그런 환경에서는 --export 를 쓰거나 Layer A(drawio_lint.py)만 강제한다.
 set -uo pipefail
 
-CAPTURE="$HOME/.claude/capture_screen.py"
-ACTION="$HOME/.claude/computer_action.py"
+CLAUDE_HOME="${CLAUDE_HOME:-$HOME/.claude}"   # 테스트에서 스텁으로 교체 가능
+CAPTURE="$CLAUDE_HOME/capture_screen.py"
+ACTION="$CLAUDE_HOME/computer_action.py"
+PICKER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/drawio_pick_window.py"
 
 FILE=""
 PROJECT=""
@@ -185,49 +187,11 @@ DRAWIO_PID=$!
 # ── 창 등장 대기 (새로 생긴 drawio 창) ────────────────────────────────
 fmt_win(){ printf '%s' "$1" | awk -F'\t' '{printf "%s %sx%s +%s,%s  %s", $1,$4,$5,$2,$3,$6}'; }
 
-# $1: "strict" 면 문서 창(제목에 파일명 또는 "- draw.io")만 인정.
-# drawio(Electron)는 스플래시 창("Flowchart Maker & Online Diagram Software")을
-# 문서 창보다 먼저 띄운다. 스플래시는 아직 배치 전이라 좌표가 (0,0) 이고, 그걸
-# 캡처하면 창이 아니라 화면 원점 영역이 찍힌다. 문서 창이 뜰 때까지 기다린다.
+# $1: "strict" 면 배치가 끝난 문서 창만 인정, "relaxed" 면 가장 큰 새 창으로 대체.
+# 선택 규칙과 그 근거는 drawio_pick_window.py 참조(디스플레이 없이 SIL 로 검증됨).
 find_window() {
-  python3 - "$CAPTURE" "$STEM" "${1:-strict}" "$BEFORE_IDS" <<'PY'
-import json, subprocess, sys
-cap, stem, mode = sys.argv[1], sys.argv[2], sys.argv[3]
-before = set(sys.argv[4].split())
-try:
-    out = subprocess.run([sys.executable, cap, "--mode", "list"],
-                         capture_output=True, text=True, timeout=20).stdout
-    wins = json.loads(out[out.index("["):out.rindex("]") + 1])
-except Exception:
-    sys.exit(1)
-
-fresh = [w for w in wins if str(w.get("id")) not in before]
-if not fresh:
-    sys.exit(1)
-
-
-def title(w):
-    return (w.get("title") or "").lower()
-
-
-def big(w):
-    return (w.get("w") or 0) >= 400 and (w.get("h") or 0) >= 300
-
-
-# 문서 창: 제목이 "<파일>.drawio - draw.io" 형태거나 파일명을 담는다
-cands = [w for w in fresh if big(w) and
-         (stem.lower() in title(w) or title(w).endswith("draw.io"))]
-if not cands and mode != "strict":
-    cands = [w for w in fresh if big(w)]      # 마지막 수단: 가장 큰 새 창
-if not cands:
-    sys.exit(1)
-w = max(cands, key=lambda w: (w.get("w") or 0) * (w.get("h") or 0))
-# 배치 전 창(0,0)은 캡처하면 화면 원점이 찍힌다 — 아직 준비 안 된 것으로 본다
-if mode == "strict" and (w.get("x"), w.get("y")) == (0, 0):
-    sys.exit(1)
-print(f"{w['id']}\t{w.get('x')}\t{w.get('y')}\t{w.get('w')}\t{w.get('h')}\t"
-      f"{w.get('title','')}")
-PY
+  # shellcheck disable=SC2086
+  python3 "$PICKER" "$CAPTURE" "$STEM" "${1:-strict}" $BEFORE_IDS
 }
 
 WIN=""
