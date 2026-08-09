@@ -79,12 +79,23 @@ has "갱신할 표 명시" "can_relay_ros2/2026-08-03.md"
 has "내부 로직만이면 그대로 마치라는 예외 안내" "내부 로직"
 teardown
 
-echo "S2  코드 수정 + 그 표도 수정 → 통과"
+echo "S2  표 갱신 + 이력 기록 둘 다 → 통과 (§6 은 둘을 모두 요구)"
+setup; tr_reset
+tr_add Edit "src/can_relay/can_relay/backend.py"
+tr_add Edit "src/can_relay/docs/code_review/can_relay_ros2/2026-08-03.md"
+tr_add Write "docs/code_updates/2026-08-09.md"
+stop
+check "exit 0 (통과)" 0 "$RC"
+teardown
+
+echo "S2b 표만 갱신하고 이력 미기록 → 차단"
 setup; tr_reset
 tr_add Edit "src/can_relay/can_relay/backend.py"
 tr_add Edit "src/can_relay/docs/code_review/can_relay_ros2/2026-08-03.md"
 stop
-check "exit 0 (통과)" 0 "$RC"
+check "exit 2 (차단)" 2 "$RC"
+has "이력 기록을 요구" "code_updates"
+hasnt "표는 이미 갱신했으므로 표 요구는 없음" "함수표를 갱신하지"
 teardown
 
 echo "S3  code_updates 만 쓰고 표는 안 고침 → 차단 (이력 기록이 표 갱신을 대신하지 않는다)"
@@ -116,9 +127,19 @@ stop
 check "exit 0 (통과)" 0 "$RC"
 teardown
 
-echo "S7  표가 없는 파일 → 통과 (PreToolUse 게이트 소관, 이중 경보 금지)"
+echo "S7  표가 없는 파일 → 표 요구는 안 하되(게이트 소관) 이력은 요구"
 setup; tr_reset
 tr_add Edit "src/can_relay/can_relay/helper.py"
+stop
+check "exit 2 (차단)" 2 "$RC"
+has "이력 기록 요구" "code_updates"
+hasnt "표 요구는 없음 (이중 경보 금지)" "함수표를 갱신하지"
+teardown
+
+echo "S7b 표 없는 파일 + 이력 기록 → 통과"
+setup; tr_reset
+tr_add Edit "src/can_relay/can_relay/helper.py"
+tr_add Write "docs/code_updates/2026-08-09.md"
 stop
 check "exit 0 (통과)" 0 "$RC"
 teardown
