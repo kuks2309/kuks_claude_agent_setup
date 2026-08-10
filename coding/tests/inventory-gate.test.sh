@@ -337,6 +337,34 @@ check "exit 2 (차단)" 2 "$RC"
 has "표 경로가 정상 산출됨" "$LOCALTBL"
 teardown
 
+echo "T15c vendored 패키지(조상에 LICENSE) → 표 요구 안 함"
+setup
+mkdir -p "$FIX/src/vendor/OrbbecSDK_ROS2/src"
+echo "MIT" > "$FIX/src/vendor/OrbbecSDK_ROS2/LICENSE"
+echo "def sdk_fn(): pass" > "$FIX/src/vendor/OrbbecSDK_ROS2/src/node.py"
+hook PreToolUse Edit "src/vendor/OrbbecSDK_ROS2/src/node.py" sess-A
+check "exit 0 (통과)" 0 "$RC"
+teardown
+
+echo "T15d 저장소 루트의 LICENSE 는 vendored 판정 근거가 아니다 (전체 무력화 방지)"
+setup
+echo "Apache-2.0" > "$FIX/LICENSE"
+hook PreToolUse Edit "$BACKEND" sess-A
+check "exit 2 (차단 유지)" 2 "$RC"
+has "표를 지목함" "$LOCALTBL"
+teardown
+
+echo "T15e vendored 라도 그 패키지에 표가 있으면 선독을 요구한다"
+setup
+mkdir -p "$FIX/src/vendor/lib/docs/code_review/lib" "$FIX/src/vendor/lib/src"
+echo "MIT" > "$FIX/src/vendor/lib/LICENSE"
+printf '| # | 함수 | 기능 | 위치 |\n|---|---|---|---|\n| 1 | `f` | 예시 | mod.py:3 |\n' \
+  > "$FIX/src/vendor/lib/docs/code_review/lib/2026-08-10.md"
+echo "def f(): pass" > "$FIX/src/vendor/lib/src/mod.py"
+hook PreToolUse Edit "src/vendor/lib/src/mod.py" sess-A
+check "exit 2 (차단)" 2 "$RC"
+teardown
+
 echo "T16 잘못된 stdin(빈 입력) → 통과 (훅이 작업을 막지 않음)"
 setup
 printf '' | "$PY" "$HOOK" >/dev/null 2>"$ERRF"

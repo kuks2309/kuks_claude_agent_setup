@@ -241,6 +241,29 @@ def edit_payload(tool_input):
     return "\n".join(parts)
 
 
+VENDOR_MARKERS = ("LICENSE", "LICENSE.txt", "LICENSE.md", "LICENCE")
+
+
+def vendored_pkg(base, target_rel):
+    """조상 패키지에 LICENSE 가 있으면 남의 코드로 본다 — 우리 인벤토리 대상이 아니다.
+
+    실측(Big-AMR 985개 중 391, LGIT 1282개 중 363)에서 차단의 절반가량이 vendored 였다:
+    `panda-firmware`·`OrbbecSDK_ROS2`·`realsense-ros` 처럼 우리가 유지보수하지 않는
+    패키지에 우리 함수표를 요구하면, 안 써도 될 표를 쓰거나 `.allow` 를 수백 줄 쌓게 된다.
+
+    **저장소 루트의 LICENSE 는 근거로 쓰지 않는다** — 우리 저장소가 오픈소스면 전 파일이
+    면제돼 게이트가 통째로 죽는다. git 미추적 여부도 쓰지 않는다 — 새로 만드는 파일이
+    미추적이라 §2 의 "신규 파일도 계획 단계에서 표 생성"이 뚫린다.
+    """
+    d = os.path.dirname(os.path.join(base, target_rel))
+    while len(d) > len(base):
+        for name in VENDOR_MARKERS:
+            if os.path.isfile(os.path.join(d, name)):
+                return True
+        d = os.path.dirname(d)
+    return False
+
+
 def covering_tables(base, target_rel):
     """대상을 등재한 표(base 상대경로). 최근접 조상 모듈의 표만, 앵커 `파일명:숫자` 필수."""
     anchor = _anchor(os.path.basename(target_rel))
@@ -312,6 +335,8 @@ def gate_write(data, cwd, root):
     if not tables:
         if os.environ.get("CODING_GATE") == "lenient":
             return 0
+        if vendored_pkg(base, rel):
+            return 0        # 남의 패키지 — 표가 있으면 위에서 이미 선독을 요구했다
         sys.stderr.write(
             f"[CODING — 인벤토리 게이트] `{rel}` 을 등재한 함수표가 없습니다. "
             "coding.md §2 는 **표가 없으면 먼저 만든다**를 요구합니다 — 표 없이 고치면 "
