@@ -22,6 +22,7 @@ Claude Code 자산(규칙·훅) 설치 저장소. 각 자산은 **폴더별 자�
 | [reverse_engineering/](reverse_engineering/principle.md) | RE 제1원칙(재구현 출력 원본 100% 동일·원본입력 양쪽구동 비트대조) + 분석 보고 원칙(존재 vs 동작 분리) | 프로젝트별 | `cd reverse_engineering && ./install.sh <타깃>` |
 | [acronym/](acronym/acronym.md) | 영어 약자 `약어(영어 단어)` 병기 + 자동 적용 훅 | 전역 (`~/.claude`) | `cd acronym && ./install.sh [--reminder-only]` |
 | [computer_use/](computer_use/computer_use.md) | PC 화면 읽기·분석·조작(read→analyze→act→re-read) — capture(읽기)+action(쓰기) 스킬·에이전트, 입력 후 피드백 안전 | 전역 (`~/.claude`) | `cd computer_use && ./install.sh` |
+| [tailscale/](tailscale/tailscale.md) | Tailscale 설정 지시 템플릿 — 새 PC 온보딩 8단계(판정 명령·통과 기준·sudo 졸업) + 접속 실패 5계층 진단(종료코드 1:1) | 전역 (`~/.claude`) | **install.sh 없음 — 수동 설치용** |
 
 ## 설치 방식
 
