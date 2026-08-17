@@ -24,6 +24,11 @@ Claude Code 자산(규칙·훅) 설치 저장소. 각 자산은 **폴더별 자�
 | [computer_use/](computer_use/computer_use.md) | PC 화면 읽기·분석·조작(read→analyze→act→re-read) — capture(읽기)+action(쓰기) 스킬·에이전트, 입력 후 피드백 안전 | 전역 (`~/.claude`) | `cd computer_use && ./install.sh` |
 | [tailscale/](tailscale/tailscale.md) | Tailscale 설정 지시 템플릿 — 새 PC 온보딩 8단계(판정 명령·통과 기준·sudo 졸업) + 접속 실패 5계층 진단(종료코드 1:1) | 전역 (`~/.claude`) | **install.sh 없음 — 수동 설치용** |
 
+## 문서
+
+- [docs/design-philosophy.md](docs/design-philosophy.md) — 본 저장소의 설계 철학 (강의용: 실패 모드 → 원칙 6 → 번들 해부 → 사례 → 이식성)
+- [copilot/copilot_adaptation.md](copilot/copilot_adaptation.md) — 번들 자산을 GitHub Copilot 에 적용하는 이식 가이드 (+ `copilot/templates/` 시작 템플릿)
+
 ## 설치 방식
 
 각 번들은 자기 폴더의 `install.sh` 로 설치한다.

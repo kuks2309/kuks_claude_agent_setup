@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "comment": "drawio-write-gate 의 Copilot 이식 예시 — .drawio 파일 편집을 감지하면 린트를 먼저 요구한다. 스크립트는 stdout 으로 {\"permissionDecision\": \"allow|deny|ask\", \"permissionDecisionReason\": \"...\"} JSON 을 내야 하며, 비0 종료는 fail-closed(거부)다. 정확한 스키마는 docs.github.com/copilot/reference/hooks-reference 를 정본으로 재확인할 것.",
+        "type": "command",
+        "command": "python3 docs/claude_guideline/drawio/hooks/drawio-write-gate.py --copilot"
+      }
+    ]
+  }
+}
