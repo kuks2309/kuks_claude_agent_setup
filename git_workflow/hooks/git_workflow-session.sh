@@ -114,9 +114,13 @@ sync_local_main(){
 }
 
 # 이 브랜치를 체크아웃한 worktree 경로 (없으면 빈 문자열)
+# 경로에 공백이 있을 수 있다(실측: 저장소 폴더명이 'LGIT-C6-Cobot ' 로 끝나는 사례).
+# awk $2 로 자르면 첫 공백까지만 잡혀 존재하지 않는 경로가 되고, cmd_end 의
+# worktree remove 가 not a working tree 로 실패 → 브랜치도 체크아웃 중이라 삭제 거부된다.
+# 따라서 'worktree ' 접두(9자) 뒤 줄 전체를 쓴다.
 worktree_of_branch(){
   git -C "$1" worktree list --porcelain | awk -v b="refs/heads/$2" '
-    /^worktree /{p=$2} /^branch /{if($2==b) print p}'
+    /^worktree /{p=substr($0,10)} /^branch /{if($2==b){print p; exit}}'
 }
 
 cmd_start(){

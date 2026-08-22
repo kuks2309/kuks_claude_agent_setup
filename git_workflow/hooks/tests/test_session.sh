@@ -8,7 +8,9 @@ ok(){ echo "  PASS $1"; PASS=$((PASS+1)); }
 no(){ echo "  FAIL $1: ${2:-}"; FAIL=$((FAIL+1)); }
 
 setup(){
-  ROOT="$(mktemp -d)"
+  # SPACE_SUFFIX 로 경로에 공백을 끼운 변형을 만든다(공백 경로 회귀 시험용).
+  ROOT="$(mktemp -d)${SPACE_SUFFIX:-}"
+  mkdir -p "$ROOT"
   git init --bare -q "$ROOT/origin.git"
   git init --bare -q "$ROOT/fito.git"
   git clone -q "$ROOT/origin.git" "$ROOT/repo"
@@ -206,6 +208,26 @@ git -C "$ROOT/repo" push -q origin --delete session/SESZ 2>/dev/null || true   #
 OUT="$(run end SESZ 2>&1)"
 echo "$OUT" | grep -q "원격 브랜치 삭제 실패" && no end_no_remote_false_alarm "없는 원격 브랜치를 실패로 보고" \
   || ok end_no_remote_false_alarm
+
+echo "== 경로에 공백이 있어도 start·end 가 정리까지 끝낸다 =="
+# worktree list --porcelain 을 awk $2 로 파싱하면 경로가 첫 공백에서 잘려 end 의
+# worktree remove 가 'not a working tree' 로 실패하고, 그러면 브랜치가 그 worktree 에
+# 체크아웃된 채라 branch -D 도 거부된다 — 정리 3단계가 통째로 무력화된다. 위 케이스는
+# 전부 mktemp 경로(공백 없음)라 이 결함을 못 잡는다. 실측: 폴더명이 'LGIT-C6-Cobot '
+# 인 프로젝트에서 종료된 세션 worktree 가 무한 누적(1개당 151MB).
+SPACE_SUFFIX="/dir name"
+setup
+run start SESW >/dev/null 2>&1
+WTW="$ROOT/repo-ses-SESW"
+[ -d "$WTW" ] && ok space_start_worktree || no space_start_worktree "worktree 없음: $WTW"
+echo "W작업" > "$WTW/w.txt"
+git -C "$WTW" add w.txt; git -C "$WTW" commit -q -m "W work"
+OUT="$(run end SESW 2>&1)"
+[ ! -e "$WTW" ] && ok space_end_dir_gone || no space_end_dir_gone "디렉터리 잔존: $WTW"
+git -C "$ROOT/repo" show-ref --verify --quiet refs/heads/session/SESW \
+  && no space_branch_deleted "브랜치 잔존" || ok space_branch_deleted
+echo "$OUT" | grep -q "정리됨" && ok space_end_reports_clean || no space_end_reports_clean "정리 완료 보고 없음"
+unset SPACE_SUFFIX
 
 echo "-- 결과: PASS=$PASS FAIL=$FAIL --"
 [ "$FAIL" = 0 ]
