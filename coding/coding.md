@@ -120,7 +120,7 @@ test -f docs/claude_guideline/coding/coding.md || echo "(coding 룰 비활성)"
 bash docs/claude_guideline/coding/checks/check-mapping.sh
 
 # ⟦CI⟧·⟦훅⟧ 태그가 실제 스크립트/훅을 가리키는지 빠른 확인
-grep -oE '⟦(CI|훅):[a-z-]+⟧' docs/claude_guideline/coding/coding.md | sort -u
+grep -oE '⟦(CI|훅):[a-z][a-z0-9-]*⟧' docs/claude_guideline/coding/coding.md | sort -u
 
 # 인벤토리 게이트 동작 검증 (설치본에서 재실행 가능 — 선언만 하고 검증 안 하는 실패 방지)
 bash docs/claude_guideline/coding/tests/inventory-gate.test.sh

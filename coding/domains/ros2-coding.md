@@ -14,6 +14,7 @@ ROS2 코드를 쓰면 활성, 아니면 면제:
 
 - **pub↔sub QoS 호환 필수** — 불일치 시 통신 두절(메시지 0). reliability(reliable/best-effort)·durability·history depth 를 맞춘다.
 - 센서 스트림 = best-effort, 명령/상태 = reliable + transient_local(latched) 관례.
+- **pub/sub 를 만드는 순간 결정 규칙이 온다** `⟦훅:ros2-qos⟧` — `hooks/coding-ros2-qos.py`(PostToolUse)가 추가분에서 `create_publisher`/`create_subscription` 을 감지하면 RxO 호환 규칙·관례 프로파일 3종·표 등재 항목(A-1/A-2/A-6)을 그 자리에 낸다. **판정하지 않고 전달만 한다** — 토픽·QoS 가 변수·f-string 인 호출이 절반을 넘어(실측) 정적 판정은 놓치는 쪽이 많고, 놓친 것을 통과시키면 "검사했다"는 착각만 남기 때문. 차단 없음.
 
 ## 2. 콜백·실행기 (executor)
 
@@ -66,7 +67,7 @@ grep -rEl 'rclpy|rclcpp|package\.xml|\.launch\.py' . >/dev/null 2>&1 \
 
 ---
 
-**VERSION**: 1.1.1 (1.1.0 + §5 별도 트리거 명시 — 작성 트리거 0건이어도 기동·실기 구동 시 활성)
+**VERSION**: 1.2.0 (1.1.0 + §5 별도 트리거 명시 — 작성 트리거 0건이어도 기동·실기 구동 시 활성; §1 에 ⟦훅:ros2-qos⟧ — pub/sub 생성 시 QoS 결정 규칙·표 등재 안내 전달)
 
 1.1.0 (1.0.0 + §5 실기·시험 기동 규율 신설 — 중복 판정을 노드이름ⓐ+토픽발행자ⓑ 2축으로(remap 시 이름 대조 실패), 전량 종료 금지, 고정 절차 기동(다중 런치 허용·절차 밖 `ros2 run` 금지), 계층 얹기는 개발·디버그 한정·측정 보고 금지; 실사격 2026-08-02 발행자 2개 측정 무효 사례 근거)
 

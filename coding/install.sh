@@ -208,6 +208,7 @@ else printf '\n' >> "$CLAUDE_MD"; cat "$SRC/claude.snippet.md" >> "$CLAUDE_MD"; 
 #   inventory-gate (PreToolUse/PostToolUse)  — 표 미독 시 수정 차단, 읽은 표 기록
 #   record-gate    (Stop)                    — 고친 코드의 표를 갱신했는지 턴 종료 시 확인
 #   comment-gate   (PostToolUse)             — 추가된 주석의 changelog 성 이력 차단
+#   ros2-qos       (PostToolUse)             — pub/sub 생성 시 QoS 결정 규칙 전달(ros2 도메인, 비차단)
 # 주입은 미루기를 막지 못하므로 차단이, ⟦CI:index-fresh⟧ 는 커밋 시점이라 커밋 없는
 # 턴이 비므로 Stop 확인이 각각 필요하다.
 if [ -d "$SRC/hooks" ]; then
@@ -242,14 +243,16 @@ if [ -d "$SRC/hooks" ]; then
     GATE_CMD="$HOOK_BASE/$BUNDLE-inventory-gate.py\""
     RECORD_CMD="$HOOK_BASE/$BUNDLE-record-gate.py\""
     COMMENT_CMD="$HOOK_BASE/$BUNDLE-comment-gate.py\""
-    "$PYBIN" - "$SETTINGS" "$REMIND_CMD" "$GATE_CMD" "$RECORD_CMD" "$COMMENT_CMD" \
+    QOS_CMD="$HOOK_BASE/$BUNDLE-ros2-qos.py\""
+    "$PYBIN" - "$SETTINGS" "$REMIND_CMD" "$GATE_CMD" "$RECORD_CMD" "$COMMENT_CMD" "$QOS_CMD" \
               "$([ -f "$SRC/hooks/$BUNDLE-reminder.py" ] && echo 1 || echo 0)" \
               "$([ -f "$SRC/hooks/$BUNDLE-inventory-gate.py" ] && echo 1 || echo 0)" \
               "$([ -f "$SRC/hooks/$BUNDLE-record-gate.py" ] && echo 1 || echo 0)" \
-              "$([ -f "$SRC/hooks/$BUNDLE-comment-gate.py" ] && echo 1 || echo 0)" <<'PYEOF'
+              "$([ -f "$SRC/hooks/$BUNDLE-comment-gate.py" ] && echo 1 || echo 0)" \
+              "$([ -f "$SRC/hooks/$BUNDLE-ros2-qos.py" ] && echo 1 || echo 0)" <<'PYEOF'
 import json, sys
-(settings_path, remind, gate, record, comment,
- has_remind, has_gate, has_record, has_comment) = sys.argv[1:10]
+(settings_path, remind, gate, record, comment, qos,
+ has_remind, has_gate, has_record, has_comment, has_qos) = sys.argv[1:12]
 try:
     with open(settings_path, encoding="utf-8") as f:
         cfg = json.load(f)
@@ -282,6 +285,10 @@ if has_record == "1":
 if has_comment == "1":
     msg.append("PostToolUse(comment-gate)=" + ensure(
         "PostToolUse", comment, 5, matcher="Write|Edit|MultiEdit"))
+if has_qos == "1":
+    # ros2 도메인 — pub/sub 생성 시 QoS 결정 규칙 전달(비차단)
+    msg.append("PostToolUse(ros2-qos)=" + ensure(
+        "PostToolUse", qos, 5, matcher="Write|Edit|MultiEdit"))
 with open(settings_path, "w", encoding="utf-8") as f:
     json.dump(cfg, f, ensure_ascii=False, indent=2)
 print("✓ settings.json 훅 등록: " + ", ".join(msg))
