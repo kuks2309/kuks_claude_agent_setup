@@ -5,6 +5,7 @@
 #   - 스크립트가 어느 태그에도 안 걸리면(고아)   → 실패
 # 스캔 대상: 코어(coding.md)·stack.md·conventions.md·domains/*.md (모든 규칙 마크다운).
 # placeholder ⟦CI:<id>⟧ 는 <id> 가 [a-z] 로 시작 안 하므로 자동 제외.
+# id 에 숫자 허용 — ros2-qos 처럼 도메인 이름에 숫자가 든다.
 # 일반 ⟦CI⟧(:id 없음)도 매칭 안 됨 — '후보(미구현)' 표기에 안전.
 set -uo pipefail
 
@@ -19,7 +20,7 @@ done
 [ "${#files[@]}" -gt 0 ] || { echo "오류: 규칙 마크다운 없음: $SRC"; exit 2; }
 
 # 1) 약속한 태그 id (실제 id 만; <id> placeholder 제외)
-tags=$(grep -hoE '⟦CI:[a-z][a-z-]*⟧' "${files[@]}" 2>/dev/null | sed -E 's/^⟦CI:(.*)⟧$/\1/' | sort -u)
+tags=$(grep -hoE '⟦CI:[a-z][a-z0-9-]*⟧' "${files[@]}" 2>/dev/null | sed -E 's/^⟦CI:(.*)⟧$/\1/' | sort -u)
 
 fail=0
 
@@ -48,7 +49,7 @@ done
 HOOKS_DIR="$SRC/hooks"
 UNTAGGED_OK="coding-reminder.py"
 
-htags=$(grep -hoE '⟦훅:[a-z][a-z-]*⟧' "${files[@]}" 2>/dev/null | sed -E 's/^⟦훅:(.*)⟧$/\1/' | sort -u)
+htags=$(grep -hoE '⟦훅:[a-z][a-z0-9-]*⟧' "${files[@]}" 2>/dev/null | sed -E 's/^⟦훅:(.*)⟧$/\1/' | sort -u)
 
 for id in $htags; do
   if [ ! -f "$HOOKS_DIR/coding-$id.py" ]; then
