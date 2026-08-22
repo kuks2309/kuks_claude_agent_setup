@@ -77,13 +77,16 @@ sync_local_main(){
   git -C "$repo" fetch origin -q 2>/dev/null || true
   git -C "$repo" show-ref --verify --quiet refs/remotes/origin/main || return 0
 
-  local head; head="$(git -C "$repo" symbolic-ref --quiet --short HEAD 2>/dev/null || echo "")"
+  # main 을 **어느 워크트리가** 물고 있는지로 판정한다. $repo 의 HEAD 만 보면 main 이
+  # 링크드 워크트리에 체크아웃된 배치를 «미체크아웃»으로 오판해 update-ref 로 가고,
+  # 그러면 그 워크트리는 HEAD 만 전진하고 index·파일은 옛 커밋에 남는다. 그 상태에서
+  # status 는 전 차이를 «스테이지된 되돌리기»로 보여주며, 거기서 누가 커밋하면 다른
+  # 세션이 병합한 것이 통째로 되돌아간다(실측: 25파일, 워킹트리 vs index 차이는 0건).
+  git -C "$repo" show-ref --verify --quiet refs/heads/main || return 0  # 로컬 main 없음
+  local mwt; mwt="$(worktree_of_branch "$repo" "main")"
 
-  if [ "$head" != "main" ]; then
-    # main 이 체크아웃돼 있지 않음 → ref 직접 갱신이 안전(작업트리 안 건드림).
-    if ! git -C "$repo" show-ref --verify --quiet refs/heads/main; then
-      return 0   # 로컬 main 자체가 없음(신규 클론 등)
-    fi
+  if [ -z "$mwt" ]; then
+    # 아무 워크트리도 main 을 쓰지 않음 → ref 직접 갱신이 안전(작업트리 안 건드림).
     if git -C "$repo" merge-base --is-ancestor main origin/main 2>/dev/null; then
       if git -C "$repo" update-ref refs/heads/main origin/main 2>/dev/null; then
         say "로컬 main → origin/main 동기화(ref 갱신)"
@@ -97,19 +100,20 @@ sync_local_main(){
     return 0
   fi
 
-  # main 체크아웃 중 — **git 자신의 보호에 맡긴다**. ff 가 미커밋 변경을 덮을 상황이면
+  # main 체크아웃 중(공유 트리든 링크드 워크트리든) — 그 트리에서 ff 하고
+  # **git 자신의 보호에 맡긴다**. ff 가 미커밋 변경을 덮을 상황이면
   # git 이 거부하고(“Your local changes would be overwritten”), 무관하면 안전하게 전진한다.
   # dirty 이면 무조건 보류하던 판정은 과했다: 공유 트리에는 타 세션의 **미추적** 파일이
   # 상시 남아 있어(ff 로 덮일 수 없는 것들) 로컬 main 이 영영 동기화되지 못했다(실측).
   # `set -e` 주의: 실패하는 명령 치환을 대입문에 쓰면 경고를 내기 전에 스크립트가
   # 종료된다(실측: ff 거부 시 보류 경고가 조용히 사라졌다). 반드시 조건문 안에서 실행.
   local out
-  if out="$(git -C "$repo" merge --ff-only origin/main 2>&1)"; then
+  if out="$(git -C "$mwt" merge --ff-only origin/main 2>&1)"; then
     say "로컬 main → origin/main 동기화(fast-forward)"
   else
     err "⚠ 로컬 main fast-forward 보류 — origin/main 과 벌어진 채 남습니다."
     err "   git: $(echo "$out" | head -2 | tr '\n' ' ')"
-    err "   해소: 해당 변경을 커밋·정리 후 git -C \"$repo\" merge --ff-only origin/main"
+    err "   해소: 해당 변경을 커밋·정리 후 git -C \"$mwt\" merge --ff-only origin/main"
   fi
 }
 

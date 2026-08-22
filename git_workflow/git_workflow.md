@@ -148,7 +148,7 @@ git log -1 --format='%s' | grep -E "^(feat|fix|docs|refactor|style|chore|test)(\
 
 ---
 
-**VERSION**: 1.8.5 (1.8.4 + `worktree_of_branch` 가 **경로의 공백**을 견딘다 — `worktree list --porcelain` 을 awk `$2` 로 파싱하면 첫 공백에서 잘려 `end` 의 worktree 제거·브랜치 삭제가 통째로 실패한다. 공백 경로 회귀 시험 4건 추가)
+**VERSION**: 1.8.6 (1.8.5 + `sync_local_main` 이 **링크드 워크트리의 main 체크아웃**을 본다 — `$repo` 의 HEAD 만 보고 «미체크아웃»으로 오판하면 `update-ref` 가 그 워크트리의 HEAD 만 옮겨 index·파일이 옛 커밋에 남고, 거기서 커밋하면 다른 세션이 병합한 것이 통째로 되돌아간다. 회귀 시험 3건 추가)
 
 **1.8.4** (1.8.3 + `start` 가 경로의 **도구 캐시 잔재**(점으로 시작하는 항목만 든 디렉터리 — 예: 다른 도구가 worktree 제거 직후 다시 만드는 `.omc/`)를 회수하고 진행한다. 실제 파일이 하나라도 있으면 회수하지 않고 기존대로 실패)
 

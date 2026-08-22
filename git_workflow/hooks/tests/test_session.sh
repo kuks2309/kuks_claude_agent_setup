@@ -157,6 +157,23 @@ run end SESG >/dev/null 2>&1
 [ "$(git -C "$ROOT/repo" rev-parse refs/heads/main)" = "$(git -C "$ROOT/repo" rev-parse origin/main)" ] \
   && ok detached_ref_updated || no detached_ref_updated "main ref 미갱신"
 
+# main 이 **링크드 워크트리**에 체크아웃돼 있으면 update-ref 는 그 트리의 HEAD 만 옮기고
+# index·파일은 옛 커밋에 남긴다 → 거기서 커밋하면 남의 병합분이 통째로 되돌아간다.
+echo "== end (로컬 main 동기화 — main 이 링크드 워크트리에 체크아웃) =="
+setup
+git -C "$ROOT/repo" checkout -q -b session/PRE      # 공유 트리 HEAD 를 main 밖으로
+git -C "$ROOT/repo" worktree add -q "$ROOT/repo-main" main
+run start SESM >/dev/null 2>&1
+WTM="$ROOT/repo-ses-SESM"
+echo "M작업" > "$WTM/m.txt"; git -C "$WTM" add -A; git -C "$WTM" commit -q -m "M work"
+run end SESM >/dev/null 2>&1
+[ "$(git -C "$ROOT/repo" rev-parse refs/heads/main)" = "$(git -C "$ROOT/repo" rev-parse origin/main)" ] \
+  && ok linked_main_advanced || no linked_main_advanced "main ref 미갱신"
+[ -z "$(git -C "$ROOT/repo-main" status --short)" ] \
+  && ok linked_main_index_clean || no linked_main_index_clean "index/HEAD 불일치 — 스테이지된 되돌리기"
+[ -f "$ROOT/repo-main/m.txt" ] \
+  && ok linked_main_files_current || no linked_main_files_current "워크트리 파일이 옛 커밋에 머묾"
+
 # 정리·생성 실패는 **드러나야** 한다. 오류를 삼키면 브랜치·디렉터리가 남아도 "정리됨"이
 # 찍히고, 다음 start 가 '이미 존재'로 막힌다(실측: 이전 실행의 디렉터리가 남아 start 실패,
 # 그때 생성된 브랜치만 남아 두 번째 실패를 부름).
